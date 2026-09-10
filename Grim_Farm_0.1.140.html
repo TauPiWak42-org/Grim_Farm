@@ -1,0 +1,2418 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>🌾 Ферма — паки и расширяемая колода (Инкрементальная)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Inter:wght@400;500;600;700;900&family=MedievalSharp&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --font-hand: 'Caveat', cursive;
+    --font-medieval: 'MedievalSharp', cursive;
+    --font-main: 'Inter', system-ui, sans-serif;
+
+    --bg-sky-top: #f5d28a;
+    --bg-sky-mid: #e8b570;
+    --bg-sky-bot: #8fae5a;
+    --bg-ground: #6b8e3e;
+    --bg-ground-dark: #4a6628;
+
+    --wood: #8b5a2b;
+    --wood-dark: #5c3a1e;
+    --wood-light: #b07a42;
+    --wood-plank: #a06834;
+
+    --soil: #4a2e1a;
+    --soil-light: #6b4423;
+    --soil-wet: #3a2412;
+
+    --panel: rgba(139, 90, 43, 0.92);
+    --panel-inner: rgba(245, 230, 200, 0.96);
+    --card-bg: #f4e4c1;
+    --card-border: #8b5a2b;
+
+    --accent: #4caf50;
+    --accent-gold: #d4a017;
+    --accent-red: #c0392b;
+    --accent-blue: #3498db;
+
+    --text-dark: #3a2817;
+    --text-light: #f5e8d0;
+    --muted: #7a5a3a;
+    --border: #5c3a1e;
+    --accent-2: #f39c12;
+    --danger: #c0392b;
+
+    --crate-glow: rgba(212, 160, 23, 0.95);
+  }
+
+  *{box-sizing:border-box}
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    font-family: var(--font-main);
+    color: var(--text-light);
+    overflow-x: hidden;
+  }
+
+  body{
+    background:
+      radial-gradient(ellipse 180px 60px at 12% 10%, rgba(255,255,255,0.85), transparent 60%),
+      radial-gradient(ellipse 220px 70px at 28% 8%, rgba(255,255,255,0.7), transparent 65%),
+      radial-gradient(ellipse 160px 50px at 55% 14%, rgba(255,255,255,0.75), transparent 60%),
+      radial-gradient(ellipse 200px 65px at 78% 9%, rgba(255,255,255,0.8), transparent 65%),
+      radial-gradient(ellipse 140px 45px at 92% 16%, rgba(255,255,255,0.7), transparent 60%),
+      linear-gradient(180deg, var(--bg-sky-top) 0%, var(--bg-sky-mid) 22%, var(--bg-sky-bot) 45%, var(--bg-ground) 55%, var(--bg-ground-dark) 100%);
+    background-attachment: fixed;
+    padding: 18px;
+    position: relative;
+  }
+
+  body::before{
+    content: '';
+    position: fixed;
+    top: 30px;
+    right: 40px;
+    width: 90px;
+    height: 90px;
+    background: radial-gradient(circle, #ffe58a 0%, #ffd54a 40%, #ffb347 70%, transparent 80%);
+    border-radius: 50%;
+    box-shadow: 0 0 60px 20px rgba(255,213,74,0.5), 0 0 120px 40px rgba(255,179,71,0.3);
+    z-index: 0;
+    pointer-events: none;
+    animation: sunPulse 4s ease-in-out infinite;
+  }
+  @keyframes sunPulse {
+    0%,100% { transform: scale(1); opacity: 0.95; }
+    50% { transform: scale(1.05); opacity: 1; }
+  }
+
+  body::after{
+    content: '';
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 50vh;
+    background-image: 
+      repeating-linear-gradient(95deg, transparent 0, transparent 8px, rgba(50,80,30,0.15) 8px, rgba(50,80,30,0.15) 9px, transparent 9px, transparent 20px),
+      repeating-linear-gradient(85deg, transparent 0, transparent 12px, rgba(80,120,40,0.12) 12px, rgba(80,120,40,0.12) 13px, transparent 13px, transparent 30px);
+    pointer-events: none;
+    z-index: 0;
+    mix-blend-mode: multiply;
+  }
+
+  h3{
+    margin: 0 0 10px;
+    font-family: var(--font-medieval);
+    font-size: 20px;
+    color: var(--text-dark);
+    text-shadow: 1px 1px 0 rgba(255,255,255,0.4);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .app{
+    display: grid;
+    grid-template-columns: 1fr 480px;
+    gap: 16px;
+    align-items: start;
+    min-height: 80vh;
+    position: relative;
+    z-index: 1;
+  }
+
+  @media (max-width: 1100px) {
+    .app { grid-template-columns: 1fr; }
+  }
+
+  .panel{
+    position: relative;
+    background: var(--panel-inner);
+    padding: 18px 18px 16px;
+    border-radius: 10px;
+    border: 4px solid var(--wood-dark);
+    box-shadow:
+      inset 0 0 0 2px var(--wood-light),
+      inset 0 0 24px rgba(139,90,43,0.2),
+      0 10px 28px rgba(0,0,0,0.35);
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(139,90,43,0.08) 0%, transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(139,90,43,0.06) 0%, transparent 45%),
+      repeating-linear-gradient(45deg, rgba(139,90,43,0.02) 0 3px, transparent 3px 8px);
+    background-color: var(--panel-inner);
+    margin-bottom: 14px;
+  }
+
+  .panel::before{
+    content: '';
+    position: absolute;
+    top: 6px; left: 6px; right: 6px; bottom: 6px;
+    background:
+      radial-gradient(circle at 4px 4px, #2a1a0a 2px, #8b6a3a 2.5px, transparent 3px),
+      radial-gradient(circle at calc(100% - 4px) 4px, #2a1a0a 2px, #8b6a3a 2.5px, transparent 3px),
+      radial-gradient(circle at 4px calc(100% - 4px), #2a1a0a 2px, #8b6a3a 2.5px, transparent 3px),
+      radial-gradient(circle at calc(100% - 4px) calc(100% - 4px), #2a1a0a 2px, #8b6a3a 2.5px, transparent 3px);
+    pointer-events: none;
+  }
+
+  .left{display:flex;flex-direction:column;gap:0}
+
+  .field{
+    display: grid;
+    gap: 12px;
+    padding: 4px;
+  }
+
+  .slot{
+    height: 110px;
+    border-radius: 8px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    overflow: hidden;
+    transition: all 0.25s ease;
+    cursor: default;
+    background:
+      repeating-linear-gradient(
+        180deg,
+        rgba(0,0,0,0.25) 0px,
+        rgba(0,0,0,0.25) 3px,
+        rgba(139,90,43,0.1) 3px,
+        rgba(139,90,43,0.1) 14px
+      ),
+      linear-gradient(180deg, var(--soil-light) 0%, var(--soil) 50%, var(--soil-wet) 100%);
+    border: 3px solid var(--wood-dark);
+    box-shadow:
+      inset 0 4px 8px rgba(0,0,0,0.3),
+      inset 0 -2px 4px rgba(255,255,255,0.08),
+      0 3px 0 var(--wood-dark),
+      0 6px 12px rgba(0,0,0,0.3);
+  }
+
+  .slot::before{
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background:
+      linear-gradient(90deg, var(--wood-dark) 0 6px, transparent 6px calc(100% - 6px), var(--wood-dark) calc(100% - 6px) 100%),
+      linear-gradient(180deg, var(--wood-dark) 0 6px, transparent 6px calc(100% - 6px), var(--wood-dark) calc(100% - 6px) 100%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .slot.empty{
+    opacity: 0.85;
+    cursor: pointer;
+  }
+
+  .slot.empty:hover{
+    opacity: 1;
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 4px 8px rgba(0,0,0,0.3),
+      0 6px 0 var(--wood-dark),
+      0 10px 20px rgba(0,0,0,0.4);
+  }
+
+  .slot .count{
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--accent-gold), #a67c00);
+    color: #fff;
+    border: 1.5px solid var(--wood-dark);
+    z-index: 3;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.4);
+    font-family: var(--font-main);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+
+  .slot .emoji{
+    font-size: 42px;
+    filter: drop-shadow(2px 3px 2px rgba(0,0,0,0.5));
+    z-index: 2;
+    animation: plantSway 3s ease-in-out infinite;
+  }
+
+  @keyframes plantSway {
+    0%, 100% { transform: rotate(-1deg); }
+    50% { transform: rotate(1deg); }
+  }
+
+  .slot.ready{
+    box-shadow:
+      inset 0 0 30px rgba(255,215,0,0.5),
+      inset 0 4px 8px rgba(0,0,0,0.2),
+      0 0 0 4px var(--accent-gold),
+      0 0 35px rgba(255,215,0,0.8),
+      0 6px 14px rgba(0,0,0,0.3);
+    animation: readyPulse 1.4s ease-in-out infinite;
+  }
+  .slot.ready .emoji{
+    animation: readyBob 1.2s ease-in-out infinite;
+    filter: drop-shadow(0 0 10px rgba(255,215,0,0.9)) drop-shadow(2px 3px 2px rgba(0,0,0,0.5));
+  }
+
+  @keyframes readyPulse {
+    0%, 100% { box-shadow: inset 0 0 25px rgba(255,215,0,0.4), 0 0 0 4px var(--accent-gold), 0 0 28px rgba(255,215,0,0.7), 0 6px 14px rgba(0,0,0,0.3); }
+    50% { box-shadow: inset 0 0 35px rgba(255,215,0,0.7), 0 0 0 5px #ffdd44, 0 0 45px rgba(255,215,0,1), 0 8px 18px rgba(0,0,0,0.35); }
+  }
+  @keyframes readyBob {
+    0%, 100% { transform: translateY(0) rotate(0); }
+    50% { transform: translateY(-5px) rotate(0); }
+  }
+
+  .slot.ready{ cursor: pointer; }
+
+  .slot.interactive{cursor:pointer}
+
+  .slot .small-note{
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: #fff;
+    background: rgba(0,0,0,0.55);
+    padding: 2px 8px;
+    border-radius: 4px;
+    z-index: 3;
+    font-family: var(--font-main);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .slot.fertile:not(.ready) {
+    background:
+      repeating-linear-gradient(
+        180deg,
+        rgba(100,255,100,0.12) 0px,
+        rgba(100,255,100,0.12) 3px,
+        rgba(70,180,70,0.08) 3px,
+        rgba(70,180,70,0.08) 14px
+      ),
+      linear-gradient(180deg, #2a5238 0%, #1e4d2b 50%, #14361e 100%);
+    box-shadow:
+      inset 0 0 18px rgba(100,255,100,0.3),
+      inset 0 4px 8px rgba(0,0,0,0.3),
+      0 0 0 2px rgba(100,255,100,0.3),
+      0 0 14px rgba(100,255,100,0.25),
+      0 3px 0 var(--wood-dark),
+      0 6px 12px rgba(0,0,0,0.3);
+  }
+
+  .slot.drought {
+    background:
+      radial-gradient(circle at 20% 30%, rgba(0,0,0,0.3) 0 3px, transparent 4px),
+      radial-gradient(circle at 70% 60%, rgba(0,0,0,0.3) 0 2px, transparent 3px),
+      radial-gradient(circle at 40% 80%, rgba(0,0,0,0.25) 0 2px, transparent 3px),
+      radial-gradient(circle at 85% 20%, rgba(0,0,0,0.25) 0 2px, transparent 3px),
+      linear-gradient(180deg, #a67c52 0%, #8b5a2b 50%, #6b4423 100%);
+    box-shadow:
+      inset 0 0 20px rgba(0,0,0,0.4),
+      0 3px 0 var(--wood-dark),
+      0 6px 12px rgba(0,0,0,0.3);
+    opacity: 1;
+  }
+  .slot.drought::after{
+    content: '🌵';
+    position: absolute;
+    font-size: 34px;
+    filter: grayscale(0.4) drop-shadow(2px 3px 2px rgba(0,0,0,0.5));
+    z-index: 2;
+    opacity: 0.8;
+  }
+
+  .pen{
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  /* ====== ИСПРАВЛЕНО: загон выше, кнопка продажи приподнята и влезает ====== */
+  .stall{
+    position: relative;
+    width: 128px;
+    height: 122px;               /* чуть выше, чтобы всё влезало */
+    padding-bottom: 20px;       /* приподнимаем содержимое над соломой */
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        rgba(0,0,0,0.12) 0 2px,
+        transparent 2px 18px,
+        rgba(255,255,255,0.04) 18px 20px
+      ),
+      linear-gradient(180deg, var(--wood-light) 0%, var(--wood) 50%, var(--wood-dark) 100%);
+    border: 3px solid var(--wood-dark);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.15),
+      inset 0 -2px 6px rgba(0,0,0,0.3),
+      0 4px 0 var(--wood-dark),
+      0 6px 12px rgba(0,0,0,0.35);
+  }
+
+  .stall:hover{
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.15),
+      inset 0 -2px 6px rgba(0,0,0,0.3),
+      0 6px 0 var(--wood-dark),
+      0 10px 18px rgba(0,0,0,0.4);
+  }
+
+  .stall::after{
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 18px;
+    background:
+      repeating-linear-gradient(
+        85deg,
+        #e6c96b 0 2px,
+        #c9a84a 2px 4px,
+        #e6c96b 4px 6px,
+        #b8942f 6px 8px
+      );
+    border-top: 2px solid #8b6a3a;
+    box-shadow: inset 0 2px 3px rgba(0,0,0,0.3);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .stall.empty-stall{
+    opacity: 0.55;
+  }
+  .stall.empty-stall::before{
+    content: '—';
+    font-size: 24px;
+    color: rgba(0,0,0,0.4);
+    font-family: var(--font-medieval);
+    z-index: 2;
+  }
+
+  .stall .animal{
+    font-size: 40px;
+    filter: drop-shadow(2px 3px 2px rgba(0,0,0,0.6));
+    z-index: 2;
+    animation: animalBob 2.4s ease-in-out infinite;
+  }
+  @keyframes animalBob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+
+  .stall .timer{
+    position: absolute;
+    right: 6px;
+    top: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #c0392b, #8b2a1e);
+    color: #fff;
+    border: 1.5px solid var(--wood-dark);
+    z-index: 3;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.4);
+    box-shadow: 0 2px 3px rgba(0,0,0,0.3);
+  }
+
+  /* кнопка продажи приподнята, компактна и полностью влезает */
+  .stall .sell-btn{
+    position: relative;
+    z-index: 3;
+    margin-top: 3px;
+    margin-bottom: 2px;
+    padding: 4px 9px;
+    font-size: 12px;
+  }
+
+  .stall.pig-max {
+    background:
+      repeating-linear-gradient(
+        90deg,
+        rgba(0,0,0,0.15) 0 2px,
+        transparent 2px 18px,
+        rgba(255,255,255,0.08) 18px 20px
+      ),
+      linear-gradient(180deg, #ffd700 0%, #d4a017 50%, #8b6a3a 100%);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.3),
+      inset 0 -2px 6px rgba(0,0,0,0.3),
+      0 4px 0 var(--wood-dark),
+      0 0 20px rgba(255,215,0,0.7),
+      0 6px 12px rgba(0,0,0,0.35);
+    animation: goldShine 2s ease-in-out infinite;
+  }
+  @keyframes goldShine {
+    0%, 100% { box-shadow: inset 0 2px 0 rgba(255,255,255,0.3), inset 0 -2px 6px rgba(0,0,0,0.3), 0 4px 0 var(--wood-dark), 0 0 20px rgba(255,215,0,0.7), 0 6px 12px rgba(0,0,0,0.35); }
+    50% { box-shadow: inset 0 2px 0 rgba(255,255,255,0.3), inset 0 -2px 6px rgba(0,0,0,0.3), 0 4px 0 var(--wood-dark), 0 0 32px rgba(255,215,0,0.95), 0 6px 12px rgba(0,0,0,0.35); }
+  }
+
+  .card{
+    background: var(--card-bg);
+    padding: 12px;
+    border-radius: 12px;
+    min-width: 150px;
+    min-height: 130px;
+    border: 3px solid var(--card-border);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    box-shadow:
+      inset 0 0 0 2px #d4a868,
+      inset 0 0 14px rgba(139,90,43,0.2),
+      0 6px 0 var(--wood-dark),
+      0 10px 20px rgba(0,0,0,0.3);
+    transition: all 0.18s ease;
+    font-size: 28px;
+    color: var(--text-dark);
+    position: relative;
+    background-image:
+      radial-gradient(circle at 30% 40%, rgba(139,90,43,0.1) 0%, transparent 50%),
+      repeating-linear-gradient(45deg, rgba(139,90,43,0.03) 0 3px, transparent 3px 8px);
+    background-color: var(--card-bg);
+    font-family: var(--font-medieval);
+    font-weight: 600;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .card::before, .card::after{
+    content: '✦';
+    position: absolute;
+    color: var(--accent-gold);
+    font-size: 14px;
+    opacity: 0.6;
+  }
+  .card::before{ top: 6px; left: 8px; }
+  .card::after{ bottom: 6px; right: 8px; transform: rotate(180deg); }
+
+  .card:hover{
+    transform: translateY(-8px) rotate(-1deg);
+    box-shadow:
+      inset 0 0 0 2px #d4a868,
+      inset 0 0 14px rgba(139,90,43,0.2),
+      0 14px 0 var(--wood-dark),
+      0 18px 30px rgba(0,0,0,0.4),
+      0 0 18px rgba(212,160,23,0.4);
+  }
+
+  .card:active{
+    transform: translateY(-2px);
+  }
+
+  .warehouse{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+
+  .wh-item{
+    background: var(--card-bg);
+    border-radius: 8px;
+    padding: 10px 12px;
+    border: 2px solid var(--wood-dark);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    height: 70px;
+    box-shadow:
+      inset 0 0 0 1px #d4a868,
+      inset 0 2px 4px rgba(255,255,255,0.3),
+      0 3px 0 var(--wood-dark),
+      0 5px 10px rgba(0,0,0,0.25);
+    color: var(--text-dark);
+    position: relative;
+    background-image:
+      radial-gradient(circle at 30% 40%, rgba(139,90,43,0.06) 0%, transparent 50%);
+    background-color: var(--card-bg);
+  }
+
+  .wh-left{display:flex;align-items:center;gap:10px}
+  .wh-emoji{font-size:30px; filter: drop-shadow(1px 2px 1px rgba(0,0,0,0.3));}
+  .wh-count{font-weight:900;font-size:16px;color: var(--text-dark);margin-left:4px; font-family: var(--font-medieval);}
+
+  .sell-btn{
+    background: linear-gradient(180deg, var(--wood-light) 0%, var(--wood) 50%, var(--wood-dark) 100%);
+    border-radius: 6px;
+    border: 2px solid var(--wood-dark);
+    padding: 6px 10px;
+    font-weight: 700;
+    cursor: pointer;
+    color: #fff;
+    font-family: var(--font-medieval);
+    font-size: 13px;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.2),
+      inset 0 -2px 4px rgba(0,0,0,0.3),
+      0 2px 0 var(--wood-dark);
+    transition: all 0.12s ease;
+  }
+  .sell-btn:hover{
+    background: linear-gradient(180deg, #c98c4a 0%, var(--wood-light) 50%, var(--wood) 100%);
+    transform: translateY(-1px);
+  }
+  .sell-btn:active{
+    transform: translateY(1px);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+  }
+
+  .hud{
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    background: linear-gradient(180deg, rgba(58,40,23,0.95), rgba(92,58,30,0.95));
+    color: var(--text-light);
+    border: 4px solid var(--wood-dark);
+    border-radius: 10px;
+    box-shadow:
+      inset 0 0 0 2px var(--wood-light),
+      inset 0 2px 8px rgba(255,200,100,0.15),
+      0 8px 20px rgba(0,0,0,0.4);
+    margin-bottom: 14px;
+  }
+
+  .hud .big{
+    font-size: 20px;
+    font-weight: 700;
+    font-family: var(--font-medieval);
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .hud .big::before{
+    font-size: 22px;
+  }
+
+  .hud-day::before{ content: '📅'; }
+  .hud-coins::before{ content: '💰'; }
+  .hud-tax::before{ content: '🧾'; }
+
+  .hud .muted{
+    font-size: 13px;
+    color: #d4a868;
+    font-family: var(--font-medieval);
+  }
+
+  .hud .small-muted{
+    color: #d4a868;
+    font-size: 12px;
+    font-family: var(--font-medieval);
+  }
+
+  .meter{
+    height: 16px;
+    background: rgba(58,40,23,0.5);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 8px;
+    border: 2px solid var(--wood-dark);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+    position: relative;
+  }
+  .meter > i{
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #c0392b 0%, #e67e22 50%, #d4a017 100%);
+    transition: width 0.4s ease;
+    position: relative;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -2px 3px rgba(0,0,0,0.3);
+  }
+  .meter > i::after{
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(45deg, rgba(255,255,255,0.1) 0 6px, transparent 6px 12px);
+  }
+
+  .artifact-list{display:flex;flex-direction:column;gap:8px}
+
+  .artifact{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(212,160,23,0.08) 0%, transparent 50%),
+      var(--card-bg);
+    border: 2px solid var(--wood-dark);
+    font-size: 13px;
+    color: var(--text-dark);
+    box-shadow:
+      inset 0 0 0 1px #d4a868,
+      0 2px 4px rgba(0,0,0,0.15);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .artifact::before{
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-gold), transparent);
+  }
+
+  .small-muted{font-size:12px;color:var(--muted); font-family: var(--font-main);}
+  .note{font-size:13px;color:var(--muted);margin-top:6px; font-style: italic;}
+
+  .crate-btn{
+    background: linear-gradient(180deg, var(--wood-light) 0%, var(--wood) 50%, var(--wood-dark) 100%);
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 2px solid var(--wood-dark);
+    font-weight: 700;
+    cursor: pointer;
+    color: #fff;
+    position: relative;
+    font-family: var(--font-medieval);
+    font-size: 13px;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.2),
+      inset 0 -2px 4px rgba(0,0,0,0.3),
+      0 3px 0 var(--wood-dark),
+      0 5px 10px rgba(0,0,0,0.3);
+    transition: all 0.15s ease;
+  }
+
+  .crate-btn:hover{
+    background: linear-gradient(180deg, #c98c4a 0%, var(--wood-light) 50%, var(--wood) 100%);
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.2),
+      inset 0 -2px 4px rgba(0,0,0,0.3),
+      0 5px 0 var(--wood-dark),
+      0 8px 14px rgba(0,0,0,0.35);
+  }
+
+  .crate-btn:active{
+    transform: translateY(1px);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+  }
+
+  .crate-btn:disabled{
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .crate-btn.has-crate{
+    background: linear-gradient(180deg, #d4a017 0%, #a67c00 50%, #5c3a1e 100%);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.3),
+      inset 0 -2px 4px rgba(0,0,0,0.3),
+      0 3px 0 var(--wood-dark),
+      0 0 18px rgba(212,160,23,0.7),
+      0 5px 10px rgba(0,0,0,0.3);
+    animation: crateGlow 1.5s ease-in-out infinite;
+  }
+  @keyframes crateGlow {
+    0%,100% { box-shadow: inset 0 2px 0 rgba(255,255,255,0.3), 0 3px 0 var(--wood-dark), 0 0 18px rgba(212,160,23,0.7), 0 5px 10px rgba(0,0,0,0.3); }
+    50% { box-shadow: inset 0 2px 0 rgba(255,255,255,0.3), 0 3px 0 var(--wood-dark), 0 0 30px rgba(212,160,23,1), 0 5px 10px rgba(0,0,0,0.3); }
+  }
+
+  .artifact-choices-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    justify-content: center;
+    align-items: center;
+    padding-top: 8px;
+  }
+
+  .artifact-card{
+    height: 150px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border-radius: 10px;
+    background: var(--card-bg);
+    border: 3px solid var(--card-border);
+    cursor: pointer;
+    padding: 10px;
+    color: var(--text-dark);
+    box-shadow:
+      inset 0 0 0 2px #d4a868,
+      inset 0 0 14px rgba(139,90,43,0.2),
+      0 5px 0 var(--wood-dark),
+      0 8px 16px rgba(0,0,0,0.3);
+    transition: all 0.2s ease;
+    position: relative;
+    background-image:
+      radial-gradient(circle at 30% 40%, rgba(139,90,43,0.1) 0%, transparent 50%),
+      repeating-linear-gradient(45deg, rgba(139,90,43,0.03) 0 3px, transparent 3px 8px);
+    background-color: var(--card-bg);
+  }
+
+  .artifact-card::before{
+    content: '';
+    position: absolute;
+    top: 4px; left: 4px; right: 4px; bottom: 4px;
+    border: 1px solid rgba(212,160,23,0.4);
+    border-radius: 6px;
+    pointer-events: none;
+  }
+
+  .artifact-card:hover{
+    transform: translateY(-6px) scale(1.03);
+    box-shadow:
+      inset 0 0 0 2px #d4a868,
+      0 12px 0 var(--wood-dark),
+      0 16px 28px rgba(0,0,0,0.4),
+      0 0 20px rgba(212,160,23,0.5);
+  }
+
+  .artifact-card .icon{font-size:36px;margin-bottom:8px; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.4));}
+  .artifact-card .name{font-weight:700;font-size:14px; font-family: var(--font-medieval);}
+  .artifact-card .desc{font-size:11px;color:var(--muted);margin-top:6px; line-height: 1.3;}
+
+  .notif{
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 22px;
+    background: linear-gradient(180deg, var(--wood-light), var(--wood-dark));
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: 3px solid var(--wood-dark);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.2),
+      0 10px 28px rgba(0,0,0,0.5),
+      0 0 20px rgba(212,160,23,0.4);
+    color: var(--text-light);
+    font-weight: 700;
+    font-family: var(--font-medieval);
+    font-size: 15px;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+    z-index: 100;
+    animation: notifIn 0.3s ease-out;
+    max-width: 90vw;
+    text-align: center;
+  }
+  @keyframes notifIn {
+    from { transform: translate(-50%, 40px); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+  }
+
+  .disasters{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+
+  .disaster-item{
+    padding: 10px 12px;
+    border-radius: 8px;
+    background:
+      radial-gradient(circle at 30% 40%, rgba(192,57,43,0.1) 0%, transparent 50%),
+      var(--card-bg);
+    border: 2px solid var(--wood-dark);
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-dark);
+    font-family: var(--font-medieval);
+    box-shadow:
+      inset 0 0 0 1px #d4a868,
+      0 2px 4px rgba(0,0,0,0.15);
+  }
+
+  .disaster-soon{
+    box-shadow:
+      inset 0 0 0 1px #d4a868,
+      0 0 18px rgba(192,57,43,0.8),
+      0 2px 4px rgba(0,0,0,0.2);
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+    animation: disasterPulse 1.2s ease-in-out infinite;
+  }
+  @keyframes disasterPulse {
+    0%,100% { box-shadow: inset 0 0 0 1px #d4a868, 0 0 18px rgba(192,57,43,0.8), 0 2px 4px rgba(0,0,0,0.2); }
+    50% { box-shadow: inset 0 0 0 1px #d4a868, 0 0 28px rgba(192,57,43,1), 0 2px 4px rgba(0,0,0,0.2); }
+  }
+
+  .coins-low {
+    color: #ff3838 !important;
+    font-weight: 900;
+    text-shadow: 0 0 12px rgba(255,56,56,0.95), 1px 1px 0 rgba(0,0,0,0.7);
+    animation: pulse-red 1s infinite;
+  }
+  @keyframes pulse-red {
+    0% { text-shadow: 0 0 6px rgba(255,56,56,0.9), 1px 1px 0 rgba(0,0,0,0.7); transform: scale(1); }
+    50% { text-shadow: 0 0 20px rgba(255,0,0,1), 1px 1px 0 rgba(0,0,0,0.7); transform: scale(1.04); }
+    100% { text-shadow: 0 0 6px rgba(255,56,56,0.9), 1px 1px 0 rgba(0,0,0,0.7); transform: scale(1); }
+  }
+
+  label.sell-all {
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: var(--font-main);
+  }
+  label.sell-all input{ cursor: pointer; }
+
+  .packs-grid{display:flex;gap:16px;justify-content:center;padding-top:12px; flex-wrap: wrap}
+
+  .pack-card{
+    width: 200px;
+    height: 200px;
+    border-radius: 12px;
+    background: var(--card-bg);
+    border: 3px solid var(--card-border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+    cursor: pointer;
+    color: var(--text-dark);
+    box-shadow:
+      inset 0 0 0 2px #d4a868,
+      inset 0 0 14px rgba(139,90,43,0.2),
+      0 6px 0 var(--wood-dark),
+      0 10px 20px rgba(0,0,0,0.35);
+    transition: all 0.2s ease;
+    text-align: center;
+    position: relative;
+    background-image:
+      radial-gradient(circle at 30% 40%, rgba(139,90,43,0.1) 0%, transparent 50%),
+      repeating-linear-gradient(45deg, rgba(139,90,43,0.03) 0 3px, transparent 3px 8px);
+    background-color: var(--card-bg);
+  }
+
+  .pack-card::before, .pack-card::after{
+    content: '✦';
+    position: absolute;
+    color: var(--accent-gold);
+    font-size: 18px;
+    opacity: 0.6;
+  }
+  .pack-card::before{ top: 10px; left: 12px; }
+  .pack-card::after{ bottom: 10px; right: 12px; transform: rotate(180deg); }
+
+  .pack-card h4{
+    margin: 8px 0 6px;
+    font-family: var(--font-medieval);
+    font-size: 18px;
+    color: var(--text-dark);
+  }
+  .pack-card p{font-size:12px;color:var(--muted);text-align:center; line-height: 1.4; margin: 0;}
+
+  .pack-card:hover{
+    transform: translateY(-8px) rotate(-1deg);
+    box-shadow:
+      inset 0 0 0 2px #d4a868,
+      0 14px 0 var(--wood-dark),
+      0 18px 30px rgba(0,0,0,0.4),
+      0 0 22px rgba(212,160,23,0.5);
+  }
+
+  .overlay-block{
+    position: fixed;
+    left: 0; top: 0; right: 0; bottom: 0;
+    background: rgba(20,10,5,0.75);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 60;
+    animation: overlayFadeIn 0.3s ease;
+  }
+  @keyframes overlayFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .panel-title{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px dashed rgba(139,90,43,0.3);
+  }
+
+  .panel-title::before{
+    font-size: 22px;
+    filter: drop-shadow(1px 2px 1px rgba(0,0,0,0.3));
+  }
+
+  .title-field::before{ content: '🌱'; }
+  .title-pen::before{ content: '🏚️'; }
+  .title-cards::before{ content: '🃏'; }
+  .title-reward::before{ content: '🏆'; }
+  .title-disasters::before{ content: '⚠️'; }
+  .title-warehouse::before{ content: '📦'; }
+  .title-artifacts::before{ content: '🧿'; }
+  .title-quests::before{ content: '📜'; }
+
+  .deco-bird{
+    position: fixed;
+    bottom: 20px;
+    left: 30px;
+    font-size: 28px;
+    z-index: 1;
+    opacity: 0.6;
+    animation: birdHop 4s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes birdHop {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(40px); }
+  }
+
+  /* ====== QUESTS ====== */
+  .quests-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .quest-card {
+    background: var(--card-bg);
+    border: 2px solid var(--wood-dark);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text-dark);
+    box-shadow:
+      inset 0 0 0 1px #d4a868,
+      0 3px 0 var(--wood-dark),
+      0 4px 8px rgba(0,0,0,0.2);
+    background-image:
+      radial-gradient(circle at 30% 40%, rgba(139,90,43,0.06) 0%, transparent 50%);
+    position: relative;
+  }
+
+  .quest-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--accent-gold), var(--accent), var(--accent-gold));
+    border-radius: 8px 8px 0 0;
+  }
+
+  /* бессрочный квест — золотая рамка */
+  .quest-card.permanent {
+    border: 2px solid var(--accent-gold);
+    box-shadow:
+      inset 0 0 0 1px var(--accent-gold),
+      0 3px 0 var(--wood-dark),
+      0 0 14px rgba(212,160,23,0.45);
+  }
+  .quest-card.permanent::after {
+    background: linear-gradient(90deg, var(--accent-gold), #fff8dc, var(--accent-gold));
+  }
+
+  .quest-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px dashed rgba(139,90,43,0.3);
+  }
+
+  .quest-npc {
+    font-size: 28px;
+    filter: drop-shadow(1px 2px 1px rgba(0,0,0,0.4));
+  }
+
+  .quest-name {
+    font-family: var(--font-medieval);
+    font-weight: 700;
+    font-size: 15px;
+    flex: 1;
+    color: var(--text-dark);
+  }
+
+  .quest-timer {
+    font-size: 12px;
+    padding: 3px 10px;
+    background: linear-gradient(180deg, var(--accent-blue), #2874a6);
+    color: white;
+    border-radius: 999px;
+    font-weight: 700;
+    font-family: var(--font-main);
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.4);
+    border: 1.5px solid var(--wood-dark);
+    box-shadow: 0 2px 3px rgba(0,0,0,0.25);
+  }
+
+  .quest-timer.urgent {
+    background: linear-gradient(180deg, var(--accent-red), #8b2a1e);
+    animation: pulse-red 1s infinite;
+  }
+
+  .quest-reqs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .quest-req {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    border: 1.5px solid rgba(139,90,43,0.4);
+    background: rgba(255,255,255,0.4);
+    font-family: var(--font-main);
+  }
+
+  .quest-req.ok {
+    background: rgba(76,175,80,0.25);
+    border-color: var(--accent);
+    color: #1e4d2b;
+    box-shadow: inset 0 1px 2px rgba(76,175,80,0.3);
+  }
+
+  .quest-req.missing {
+    background: rgba(192,57,43,0.15);
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+  }
+
+  .quest-req .have {
+    font-size: 11px;
+    opacity: 0.75;
+    font-weight: 500;
+  }
+
+  .quest-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px dashed rgba(139,90,43,0.2);
+  }
+
+  .quest-reward {
+    font-family: var(--font-medieval);
+    font-size: 13px;
+    color: var(--accent-gold);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-shadow: 0 0 6px rgba(212,160,23,0.3);
+  }
+
+  .quest-reward-coins {
+    color: var(--accent-gold);
+  }
+
+  .quest-reward-crates {
+    color: #8b6a3a;
+  }
+
+  .quest-reward-artifact {
+    color: var(--accent);
+  }
+
+  .quest-btn {
+    padding: 6px 14px;
+    font-size: 13px;
+  }
+
+  .quest-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+  }
+
+  .quest-btn:not(:disabled) {
+    background: linear-gradient(180deg, var(--accent) 0%, #3d8b40 50%, #1e4d2b 100%);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.25),
+      inset 0 -2px 4px rgba(0,0,0,0.3),
+      0 2px 0 var(--wood-dark),
+      0 0 10px rgba(76,175,80,0.4);
+  }
+
+  .quest-btn:not(:disabled):hover {
+    background: linear-gradient(180deg, #5cc05f 0%, var(--accent) 50%, #3d8b40 100%);
+  }
+
+  .crate-btn.hidden-crate {
+    display: none;
+  }
+
+  /* ====== BANKRUPTCY WARNING (center screen) ====== */
+  .warning-overlay{
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(180deg, #8b2a1e, #5c1a10);
+    border: 3px solid var(--wood-dark);
+    border-radius: 12px;
+    padding: 24px 32px;
+    max-width: 480px;
+    text-align: center;
+    color: #fff;
+    font-family: var(--font-medieval);
+    font-size: 18px;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.6);
+    box-shadow: 0 0 40px rgba(255,0,0,0.6), 0 10px 30px rgba(0,0,0,0.5);
+    z-index: 200;
+    pointer-events: none;
+    animation: warningFade 3s ease forwards;
+  }
+  @keyframes warningFade {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+    10% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+  }
+
+</style>
+</head>
+<body>
+
+<div class="deco-bird">🐦</div>
+
+<!-- Bankruptcy warning (center screen) -->
+<div id="warningOverlay" class="warning-overlay" style="display:none;"></div>
+
+<div class="app">
+  <div class="left">
+    <div class="panel">
+      <div class="panel-title title-field"><h3 style="margin:0">Ваши поля</h3></div>
+      <div class="field" id="field"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title title-pen"><h3 style="margin:0">Загоны для животных</h3></div>
+      <div class="pen" id="pen"></div>
+    </div>
+
+    <div class="panel" style="min-height:220px;">
+      <div class="panel-title title-cards" style="width:100%; justify-content:center;"><h3 style="margin:0; justify-content:center;">Выберите карту дня</h3></div>
+      <div style="display:flex;gap:14px;justify-content:center;align-items:center" id="cards"></div>
+    </div>
+
+    <div class="panel" id="artifactPanel" style="padding-top:8px; display:none;">
+      <div class="panel-title title-reward" style="width:100%; justify-content:center;"><h3 style="margin:0">Награда — выберите артефакт</h3></div>
+      <div id="artifactChoicesContainer" class="artifact-choices-grid"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title title-disasters"><h3 style="margin:0">Надвигающиеся беды</h3></div>
+      <div class="disasters" id="disasters"></div>
+      <div style="margin-top:10px">
+        <div class="meter" title="Прогресс до следующей беды"><i id="meterFill" style="width:0%"></i></div>
+        <div class="note" id="streakNote">До беды: —</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="extras">
+    <div class="panel">
+      <div class="panel-title title-warehouse"><h3 style="margin:0">Склад и продажи</h3></div>
+      <div class="warehouse" id="warehouse"></div>
+    </div>
+
+    <div class="hud" id="hud">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="big hud-day">День: <span id="day">1</span></div>
+        <div class="big hud-coins">Монеты: <span id="coins">15</span></div>
+        <div class="muted hud-tax" style="font-size:13px;">Налог/день: <span id="tax">0</span></div>
+      </div>
+      <div style="margin-left:auto;text-align:right; display:flex; flex-direction:column; gap:6px; align-items: flex-end;">
+        <div class="small-muted">📦 Запечатанные ящики: <span id="crates" style="font-weight:900;color:var(--accent-gold)">0</span></div>
+        <div style="margin-top:4px;display:flex;gap:8px;align-items:center; flex-wrap:wrap; justify-content: flex-end;">
+          <button id="openCrate" class="crate-btn">🎁 Открыть</button>
+          <button id="buyField" class="crate-btn">🌾 Поле</button>
+          <button id="buyPen" class="crate-btn">🏚️ Загон</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title title-quests"><h3 style="margin:0">Квесты жителей</h3></div>
+      <div class="quests-list" id="questsList"></div>
+      <div class="note">Жители деревни просят продукты. Квесты усложняются со временем. Постоянный заказ приносит артефакты.</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title title-artifacts"><h3 style="margin:0">Артефакты</h3></div>
+      <div class="artifact-list" id="artifactList"><div class="small-muted">Артефактов пока нет</div></div>
+      <div class="note">Артефакты дают пассивные бонусы. Их можно продать (кнопка «Продать») за монеты и ящики.</div>
+    </div>
+  </div>
+</div>
+
+<div id="notifRoot"></div>
+
+<script>
+(() => {
+  const iconMap = { wheat:'🌾',potato:'🥔',cabbage:'🥬',cow:'🐄',chicken:'🐔',pig:'🐖',wolf:'🐺',milk:'🥛',eggs:'🥚',hay:'🌿', eggplant:'🍆', sunflower:'🌻', goat:'🐐', tulip:'🌷' };
+
+  let day=1, coins=15;
+  let field=[null,null,null,null];
+  let pens=[null,null,null];
+  let warehouse={wheat:0,potato:0,cabbage:0,milk:0,eggs:0,hay:0,eggplant:0};
+  let availableCards = [];
+  let baseCards = [];
+  let availableArtifacts = [];
+  let artifactPool = [];
+  let currentCards = [];
+  let gameOver=false;
+  let sealedCrates = 0;
+  let meter = 0;
+  let artifacts = [];
+  let artifactChoices = null;
+  let upcomingDisasters = [];
+  let droughtFields = {};
+  let fertilizedFields = [];
+  let quests = [];
+
+  let packs = []; 
+  let tulipPrice = 2; // стартовая цена тюльпанов 2 монеты
+  let tulipLastChange = 0;
+  let taxIncrease = 0;
+
+  let pickedPacks = new Set();
+  let packChoices = null;
+
+  let pensBoughtCount = 0; const maxPensBuy = 2;
+  const sellAllSettings = { wheat:false, potato:false, eggplant:true, cabbage:true, milk:true, eggs:true, hay:false, sunflower:false, fertilizer:false };
+
+  let tutorialActive = false;
+
+  // Bankruptcy warning state
+  let bankruptcyWarningShown = false;
+
+  // ====== ИНКРЕМЕНТАЛЬНЫЕ СИСТЕМЫ ======
+  let questDifficultyLevel = 0;     // уровень сложности обычных квестов
+  let progressiveTax = 0;           // прогрессивный налог
+  let permanentQuestLevel = 1;      // уровень бессрочного квеста
+  let permanentQuest = null;        // текущий бессрочный квест
+
+  const el=id=>document.getElementById(id);
+  function notify(text, timeout=2800){ const n=document.createElement('div'); n.className='notif'; n.textContent=text; document.getElementById('notifRoot').appendChild(n); setTimeout(()=>{ n.remove(); }, timeout); }
+  
+  function showWarning(text) {
+    const overlay = el('warningOverlay');
+    overlay.textContent = text;
+    overlay.style.display = 'block';
+    overlay.style.animation = 'none';
+    overlay.offsetHeight;
+    overlay.style.animation = '';
+    setTimeout(() => { overlay.style.display = 'none'; }, 3000);
+  }
+
+  function addCrates(n){ if(n<=0) return; const hasDoubler = artifacts.some(a => a.id === 'crate_doubler'); sealedCrates += n * (hasDoubler ? 2 : 1); }
+  function getTaxReduction(){ return artifacts.filter(a=>a.id==='tax_reduce').length; }
+
+  // ====== ПРОГРЕССИВНЫЙ НАЛОГ ======
+  // Растёт медленно до 10, затем +1/день до 40, +3/день до 100, +10/день до 300, затем +100/день
+  function growTax() {
+    if (progressiveTax < 10) {
+      if (day % 5 === 0) progressiveTax += 1;
+    } else if (progressiveTax < 40) {
+      progressiveTax += 1;
+    } else if (progressiveTax < 100) {
+      progressiveTax += 3;
+    } else if (progressiveTax < 300) {
+      progressiveTax += 10;
+    } else {
+      progressiveTax += 100;
+    }
+  }
+
+  function computeTax(){ 
+    return Math.max(0, progressiveTax - getTaxReduction() + taxIncrease); 
+  }
+
+  function weightedPick(list, weights){ const total = weights.reduce((s,w)=>s+w,0); let r = Math.random() * total; for(let i=0;i<list.length;i++){ if(r < weights[i]) return list[i]; r -= weights[i]; } return list[list.length-1]; }
+
+  function getItemPrice(t) {
+    if(t==='eggplant') return 3;
+    if(t==='tulip') return tulipPrice;
+    if(t==='sunflower') return 2;
+    if(t==='potato') return 4;
+    if(t==='cabbage') return 8;
+    if(t==='milk' || t==='wheat') return 1;
+    if(t==='eggs') return 2;
+    if(t==='hay' || t==='fertilizer') return 0;
+    return 1;
+  }
+
+  function getCardCoinDelta(card) {
+    let delta = 0;
+    (card.icon || []).forEach(icon => {
+      const s = String(icon);
+      const m1 = s.match(/\+(\d+)💰/);
+      const m2 = s.match(/-(\d+)💰/);
+      const m3 = s.match(/💰\+(\d+)/);
+      const m4 = s.match(/💰-(\d+)/);
+      if (m1) delta += parseInt(m1[1]);
+      if (m2) delta -= parseInt(m2[1]);
+      if (m3) delta += parseInt(m3[1]);
+      if (m4) delta -= parseInt(m4[1]);
+    });
+    return delta;
+  }
+
+  function createCard(obj){ return Object.assign({ id: obj.id || ('card_' + Math.random().toString(36).slice(2,8)), name: obj.name || '', icon: obj.icon || ['❓'], fn: obj.fn || (()=>{}) }, obj); }
+  function createArtifact(obj){ return Object.assign({ id: obj.id || ('art_' + Math.random().toString(36).slice(2,8)), name: obj.name || '', icon: obj.icon || '🧿', desc: obj.desc || '' }, obj); }
+  function createPack(obj){ return Object.assign({ id: obj.id || ('pack_' + Math.random().toString(36).slice(2,8)), name: obj.name || 'Пак', desc: obj.desc || '', cards: obj.cards || [], artifacts: obj.artifacts || [], onPick: obj.onPick || (()=>{}) }, obj); }
+
+  function setupBaseCards(){
+    baseCards = [
+      createCard({ id: 'b_wheat1', icon:['🌾','+1💰'], name:'Пшеница ×1', fn:()=>plant('wheat',1, +1) }),
+      createCard({ id: 'b_wheat2', icon:['🌾','🌾'], name:'Пшеница ×2', fn:()=>plant('wheat',2, 0) }),
+      createCard({ id: 'b_wheat3', icon:['🌾','🌾','🌾','-1💰'], name:'Пшеница ×3', fn:()=>plant('wheat',3, -1) }),
+      createCard({ id: 'b_potato1', icon:['🥔'], name:'Картошка ×1', fn:()=>plant('potato',1, 0) }),
+      createCard({ id: 'b_potato2', icon:['🥔','🥔','-1💰'], name:'Картошка ×2', fn:()=>plant('potato',2,-1) }),
+      createCard({ id: 'b_potato3', icon:['🥔','🥔','🥔','-3💰'], name:'Картошка ×3', fn:()=>plant('potato',3,-3) }),
+      createCard({ id: 'b_cabbage1', icon:['🥬','-1💰'], name:'Капуста ×1', fn:()=>plant('cabbage',1,-1) }),
+      createCard({ id: 'b_cabbage2', icon:['🥬','🥬','-4💰'], name:'Капуста ×2', fn:()=>plant('cabbage',2,-4) }),
+      createCard({ id: 'b_cow1', icon:['🐄'], name:'Корова', fn:()=>gainAnimal('cow',1,0) }),
+      createCard({ id: 'b_cow2', icon:['🐄','🐄','-1💰'], name:'Коровы ×2', fn:()=>gainAnimal('cow',2,-1) }),
+      createCard({ id: 'b_chicken1', icon:['🐔','-3💰'], name:'Курица', fn:()=>gainAnimal('chicken',1,-1) }),
+      createCard({ id: 'b_chicken2', icon:['🐔','🐔','-5💰'], name:'Куры ×2', fn:()=>gainAnimal('chicken',2,-4) }),
+      createCard({ id: 'b_pig1', icon:['🐖','-3💰'], name:'Свинья', fn:()=>gainAnimal('pig',1,-3) }),
+      createCard({ id: 'b_wolves1', icon:['🐺','+3💰'], name:'Нападение волков', fn:()=>wolvesAttack(1,3) }),
+      createCard({ id: 'b_wolves2', icon:['🐺','🐺','+5💰'], name:'Нападение волков ×2', fn:()=>wolvesAttack(2,5) }),
+      createCard({ id: 'b_wolves3', icon:['🐺','🐺','🐺','+6💰'], name:'Нападение волков ×3', fn:()=>wolvesAttack(3,6) }),
+      createCard({ id: 'b_eggplant1', icon:['🍆'], name:'Баклажан ×1', fn:()=>plant('eggplant',1, 0) }),
+      createCard({ id: 'b_eggplant2', icon:['🍆','🍆','-2💰'], name:'Баклажан ×2', fn:()=>plant('eggplant',2, -2) }),
+      createCard({ id: 'b_eggplant3', icon:['🍆','🍆','🍆','-5💰'], name:'Баклажан ×3', fn:()=>plant('eggplant',3, -5) })
+    ];
+  }
+
+  function setupBaseArtifacts(){
+    artifactPool = [
+      createArtifact({ id:'cabbage_price', name:'Царская Капуста', icon:'🥬', desc:'+4 к продаже капусты', applyOnSell: (item, base) => item==='cabbage' ? base+4 : base }),
+      createArtifact({ id:'potato_price', name:'Клубневый Амулет', icon:'🥔', desc:'+3 к продаже картошки', applyOnSell: (item, base) => item==='potato' ? base+3 : base }),
+      createArtifact({ id:'wheat_price', name:'Серебряное Зерно', icon:'🌾', desc:'+2 к продаже пшеницы', applyOnSell: (item, base) => item==='wheat' ? base+2 : base }),
+      createArtifact({ id:'add_pen', name:'Стальной Загон', icon:'🔩', desc:'Добавляет слот загона (+1)' }),
+      createArtifact({ id:'tax_reduce', name:'Печать Освобождения', icon:'📉', desc:'Уменьшает налог на 1' }),
+      createArtifact({ id:'crate_doubler', name:'Дублирующий Кристалл', icon:'🔄', desc:'Удваивает количество ящиков' }),
+      createArtifact({ id:'coin_charm', name:'Монетный Талисман', icon:'🧿', desc:'+1 монета при каждой продаже (шанс 20%)', applyOnSell: (item, base) => { if(Math.random() < 0.20) return base+1; return base; } }),
+      createArtifact({ id:'harvest_gem', name:'Драгоценный Урожай', icon:'💠', desc:'Малый шанс +1 к собранному урожаю', applyOnHarvest: (type) => { if(Math.random()<0.18) return 1; return 0; } }),
+      createArtifact({ id:'crate_key', name:'Ключ-Кристалл', icon:'🔑', desc:'Иногда приносит дополнительный ящик', applyOnEndDay: () => { if(Math.random()<0.12) return 1; return 0; } }),
+      createArtifact({ id:'eggplant_boost', name:'Удлинитель жизни баклажана', icon:'🔋', desc:'Увеличивает число сборов баклажана на +2 (всего 5 сборов)', applyOnPlant: (type, plantObj) => { if(type==='eggplant'){ plantObj.remainingHarvests = 5; } } }),
+      createArtifact({ id:'chicken_diet', name:'Покровитель курей', icon:'🐓', desc:'Курицы едят реже — раз в 3 хода (вместо 2)', applyOnPick: (state)=>{} }),
+      createArtifact({ id:'botanical_seed', name:'Ботанический Самоцвет', icon:'🌱', desc:'Каждые 3 хода даёт 1 случайный растительный товар на склад', applyOnEndDay: ({day,warehouse,availablePlants})=>{
+        try{
+          if(day % 3 === 0){ const choices = availablePlants || [];
+            if(!choices || choices.length===0) return 0;
+            const pick = choices[Math.floor(Math.random()*choices.length)];
+            warehouse[pick] = (warehouse[pick]||0) + 1;
+            return 0;
+          }
+        }catch(e){}
+        return 0;
+      } }),
+      createArtifact({ id:'milk_price', name:'Молочный Амулет', icon:'🥛', desc:'+1 к цене при продаже молока', applyOnSell: (item, base) => item==='milk' ? base+1 : base }),
+      createArtifact({ id:'bulk_bonus', name:'Бонус оптовой продажи', icon:'📦', desc:'При "Продать всё" даёт +5 монет за каждые 10 проданных единиц одного товара' })
+    ];
+  }
+
+  function setupPacks(){
+    const sunArtifact = createArtifact({ id:'sunflower_boost', name:'Золотое Семечко', icon:'🌻', desc:'При сборе подсолнуха собирается 6 (вместо 4)', applyOnHarvest: (type) => type==='sunflower' ? 2 : 0 });
+    const sunPack = createPack({
+      id:'sunflower_pack', name:'Пак: Подсолнухи', desc:'Добавляет подсолнухи в пул карт',
+      cards: [
+        createCard({ id:'sun_1', name:'Подсолнух ×1', icon:['🌻'], fn:()=>plant('sunflower',1,0) }),
+        createCard({ id:'sun_2', name:'Подсолнух ×2', icon:['🌻','🌻','-2💰'], fn:()=>plant('sunflower',2,-2) }),
+        createCard({ id:'sun_3', name:'Подсолнух ×3', icon:['🌻','🌻','🌻','-5💰'], fn:()=>plant('sunflower',3,-5) }),
+        createCard({ id:'sun_curse', name:'Проклятая карта', icon:['💰+5','🦗🦗'], fn:()=>{ coins += 5; let attempts = 2; let eaten = 0; for(let a=0;a<attempts;a++){ if(eaten >= 2) break; if(Math.random() < 0.75){ for(let i=0;i<field.length;i++){ if(field[i]){ field[i] = null; eaten++; break; } } } } if(eaten>0) notify(`Проклятие: саранча уничтожила ${eaten} засеянных клеток`); } })
+      ],
+      artifacts: [ sunArtifact ],
+      onPick: ()=>{ if(!(warehouse.hasOwnProperty('sunflower'))) warehouse.sunflower = 0; }
+    });
+
+    const goatArtifact = createArtifact({ id:'goat_planter', name:'Садовник-автомат', icon:'🌱', desc:'Раз в 5 дней сажает 1 капусту если есть свободное поле', applyOnDaily: ({day})=>{
+      if(day % 5 === 0){ plant('cabbage',1,0); }
+    } });
+    const goatPack = createPack({
+      id:'goat_pack', name:'Пак: Козлы', desc:'Добавляет коз и артефакт автоматической посадки капусты',
+      cards: [
+        createCard({ id:'goat_1', name:'Козёл', icon:['🐐','-2💰'], fn:()=>gainAnimal('goat',1,-2) }),
+        createCard({ id:'goat_2', name:'Козлы ×2', icon:['🐐','🐐','-6💰'], fn:()=>gainAnimal('goat',2,-6) }),
+        createCard({ id:'goat_cabbage3', name:'Посадить капусту ×3', icon:['🥬','🥬','🥬','-7💰'], fn:()=>plant('cabbage',3,-7) }),
+        createCard({ id:'wolves_4', name:'4 волка', icon:['🐺🐺🐺🐺','+7💰'], fn:()=>{ coins += 7; wolvesAttack(4,0); } })
+      ],
+      artifacts: [ goatArtifact ],
+      onPick: ()=>{}
+    });
+
+    const fertilizerPack = createPack({
+      id:'fertilizer_pack', name:'Пак: Удобрения', desc:'Добавляет удобрения в игру — ими можно удобрять поля',
+      cards: [
+        createCard({ id:'fert_1', name:'Удобрение ×1', icon:['🧪'], fn:()=>{ warehouse.fertilizer = (warehouse.fertilizer||0) + 1; notify('Получено 1 удобрение'); } }),
+        createCard({ id:'fert_2', name:'Удобрение ×2 (-3💰)', icon:['🧪','🧪','-3💰'], fn:()=>{ coins -= 3; warehouse.fertilizer = (warehouse.fertilizer||0) + 2; notify('Куплено 2 удобрения за 3 монеты'); } }),
+        createCard({ id:'fert_3', name:'Удобрение ×3 (-7💰)', icon:['🧪','🧪','🧪','-7💰'], fn:()=>{ coins -= 7; warehouse.fertilizer = (warehouse.fertilizer||0) + 3; notify('Куплено 3 удобрения за 7 монет'); } }),
+        createCard({ id:'card_drought_5', name:'Засуха на поле (5 ходов) +2💰', icon:['🌵','+2💰'], fn:()=>{ coins += 2; triggerDroughtCardSingle(5); } })
+      ],
+      artifacts: [],
+      onPick: ()=>{ if(!(warehouse.hasOwnProperty('fertilizer'))) warehouse.fertilizer = 0; notify('Пак Удобрения выбран — в складе появился слот для удобрений'); }
+    });
+
+    // Тюльпанная ловушка: повышает цену раз в 6 ходов
+    const tulipBoostArtifact = createArtifact({ id:'tulip_surge', name:'Тюльпанная Ловушка', icon:'🌷', desc:'Каждые 6 ходов +1 к цене тюльпанов', applyOnDaily: ({day})=>{ if(day % 6 === 0 && pickedPacks.has('tulip_pack')){ tulipPrice = Math.min(20, tulipPrice + 1); tulipLastChange = 1; notify('Артефакт поднимает цену тюльпанов на +1'); } } });
+    const tulipPack = createPack({
+      id:'tulip_pack', name:'Пак: Тюльпаны', desc:'Добавляет тюльпаны в пул. Их цена изменяется каждый ход (в складе).',
+      cards: [
+        createCard({ id:'tulip_1', name:'Тюльпан ×1', icon:['🌷'], fn:()=>plant('tulip',1,0) }),
+        createCard({ id:'tulip_2', name:'Тюльпаны ×2', icon:['🌷','🌷','-3💰'], fn:()=>plant('tulip',2,-3) }),
+        createCard({ id:'tulip_3', name:'Тюльпаны ×3', icon:['🌷','🌷','🌷','-7💰'], fn:()=>plant('tulip',3,-7) }),
+        createCard({ id:'tulip_raise_card', name:'Взлёт цены тюльпанов', icon:['+5⬆️🌷','+1🧾'], fn:()=>{ tulipPrice = Math.min(20, tulipPrice + 5); taxIncrease += 1; notify('Цена тюльпанов повышена на 5 монет; налог +1 (навсегда)'); } })
+      ],
+      artifacts: [ tulipBoostArtifact ],
+      onPick: ()=>{ if(!(warehouse.hasOwnProperty('tulip'))) warehouse.tulip = 0; notify('Пак Тюльпаны выбран — в складе появился слот для тюльпанов'); }
+    });
+
+    packs = [ sunPack, goatPack, fertilizerPack, tulipPack ];
+  }
+
+  function getAvailablePlantTypes(){ const base = ['wheat','cabbage','potato','eggplant']; if(pickedPacks.has('sunflower_pack')) base.push('sunflower'); if(pickedPacks.has('tulip_pack')) base.push('tulip'); return base; }
+
+  function getAvailableItemsForQuests() {
+    const all = ['wheat','potato','cabbage','eggplant','milk','eggs'];
+    if (pickedPacks.has('sunflower_pack')) all.push('sunflower');
+    if (pickedPacks.has('tulip_pack')) all.push('tulip');
+    return all;
+  }
+
+  // NPC без имён собственных
+  const NPC_POOL = [
+    {icon: '👨‍🌾', name: 'Крестьянин'},
+    {icon: '👵', name: 'Старушка'},
+    {icon: '👨‍🍳', name: 'Повар'},
+    {icon: '🧙', name: 'Странник'},
+    {icon: '👸', name: 'Знатная дама'},
+    {icon: '🧑‍🎨', name: 'Художник'},
+    {icon: '🤴', name: 'Торговец'},
+    {icon: '👷', name: 'Строитель'},
+    {icon: '🧝‍♀️', name: 'Лесная жительница'},
+    {icon: '🧛', name: 'Загадочный гость'},
+    {icon: '🧚', name: 'Фея'},
+    {icon: '👼', name: 'Паломник'},
+    {icon: '🤠', name: 'Путешественник'},
+    {icon: '🧑‍🚀', name: 'Чужеземец'}
+  ];
+
+  // ====== СЛОЖНОСТЬ ОБЫЧНЫХ КВЕСТОВ ======
+  // Начало: 1 тип, 1-4 продукта. Каждый уровень циклически:
+  // +1 к максимуму продуктов -> +1 к минимуму продуктов -> +1 к типу (не больше 7)
+  function getQuestDifficulty() {
+    const L = questDifficultyLevel;
+    let maxQty = 4 + Math.floor((L + 2) / 3);
+    let minQty = 1 + Math.floor((L + 1) / 3);
+    let types = 1 + Math.floor(L / 3);
+    types = Math.min(types, 7);
+    maxQty = Math.min(maxQty, 50);
+    if (minQty > maxQty) minQty = maxQty;
+    return { types, minQty, maxQty, level: L };
+  }
+
+  // Ящики: 0 до 3 уровня, затем 1 + по 1 за каждые 5 уровней
+  function getQuestCrates(level) {
+    if (level < 3) return 0;
+    return 1 + Math.floor((level - 3) / 5);
+  }
+
+  function generateQuest() {
+    const diff = getQuestDifficulty();
+    const level = diff.level;
+    const available = getAvailableItemsForQuests();
+    const numItems = Math.min(diff.types, available.length);
+    const shuffled = available.slice().sort(() => Math.random() - 0.5);
+    const picked = shuffled.slice(0, numItems);
+    const requirements = picked.map(item => ({
+      item,
+      qty: diff.minQty + Math.floor(Math.random() * (diff.maxQty - diff.minQty + 1))
+    }));
+    
+    const totalValue = requirements.reduce((sum, r) => sum + r.qty * getItemPrice(r.item), 0);
+    
+    // В начале денег меньше, растут со сложностью
+    const multiplier = 1.0 + Math.min(level * 0.1, 1.5);
+    const bonus = 3 + Math.floor(level / 2) + Math.floor(Math.random() * 6);
+    const rewardCoins = Math.floor(totalValue * multiplier) + bonus;
+    
+    const rewardCrates = getQuestCrates(level);
+    
+    const npc = NPC_POOL[Math.floor(Math.random() * NPC_POOL.length)];
+    
+    return {
+      id: 'q_' + Math.random().toString(36).slice(2,8),
+      npc: npc.icon,
+      name: npc.name,
+      requirements,
+      daysLeft: 10 + Math.floor(Math.random() * 16),
+      rewardCoins,
+      rewardCrates,
+      totalValue
+    };
+  }
+
+  // ====== БЕССРОЧНЫЙ КВЕСТ ======
+  // Ур. N: N+1 типов продуктов по N+2 штук. Ур.1 — лёгкие продукты.
+  // Награда: выбор артефакта (без денег).
+  function getPermanentQuestDifficulty() {
+    return { types: permanentQuestLevel + 1, qty: permanentQuestLevel + 2 };
+  }
+
+  function generatePermanentQuest() {
+    const diff = getPermanentQuestDifficulty();
+    const available = getAvailableItemsForQuests();
+    let pool;
+    if (permanentQuestLevel === 1) {
+      // лёгкие продукты (дешёвые)
+      pool = ['wheat', 'milk', 'eggs'].filter(i => available.includes(i));
+      if (pool.length === 0) pool = available;
+    } else {
+      pool = available;
+    }
+    const numItems = Math.min(diff.types, pool.length);
+    const shuffled = pool.slice().sort(() => Math.random() - 0.5);
+    const picked = shuffled.slice(0, numItems);
+    const requirements = picked.map(item => ({ item, qty: diff.qty }));
+    permanentQuest = {
+      id: 'perm_quest',
+      npc: '🏛️',
+      name: 'Постоянный заказ',
+      requirements,
+      isPermanent: true,
+      level: permanentQuestLevel
+    };
+  }
+
+  // Общий механизм выбора артефактов
+  function rollArtifactChoices(count) {
+    const candidates = Array.from(new Map((availableArtifacts.concat(artifactPool)).map(a=>[a.id,a])).values()).filter(a=>!artifacts.find(x=>x.id===a.id));
+    if (candidates.length === 0) return null;
+    const picks = [];
+    const pool = candidates.slice();
+    while (picks.length < count && pool.length > 0) {
+      const idx = Math.floor(Math.random() * pool.length);
+      picks.push(pool.splice(idx, 1)[0]);
+    }
+    return picks;
+  }
+
+  function acceptPermanentQuest() {
+    if (artifactChoices) { notify('Сначала выберите артефакт-награду'); return; }
+    if (packChoices) { notify('Сначала выберите пак'); return; }
+    if (tutorialActive) { notify('Завершите обучение прежде чем продолжить'); return; }
+    const q = permanentQuest;
+    if (!q) return;
+    for (const r of q.requirements) {
+      if ((warehouse[r.item] || 0) < r.qty) {
+        notify('❌ Недостаточно продуктов для постоянного заказа!');
+        return;
+      }
+    }
+    for (const r of q.requirements) warehouse[r.item] -= r.qty;
+
+    permanentQuestLevel++;
+
+    const choices = rollArtifactChoices(3);
+    if (choices) {
+      artifactChoices = choices;
+      notify('✨ Постоянный заказ выполнен! Выберите артефакт в награду.', 3200);
+    } else {
+      const fallback = 12 + Math.floor(Math.random() * 10);
+      coins += fallback;
+      notify(`✨ Заказ выполнен! Артефактов не осталось, +${fallback} монет.`, 3200);
+    }
+
+    generatePermanentQuest(); // новый уровень
+    updateUI();
+  }
+
+  function acceptQuest(id) {
+    if (artifactChoices) { notify('Сначала выберите артефакт-награду'); return; }
+    if (packChoices) { notify('Сначала выберите пак'); return; }
+    if (tutorialActive) { notify('Завершите обучение прежде чем продолжить'); return; }
+    const q = quests.find(x => x.id === id);
+    if (!q) return;
+    
+    for (const r of q.requirements) {
+      if ((warehouse[r.item] || 0) < r.qty) {
+        notify('❌ Недостаточно продуктов для выполнения квеста!');
+        return;
+      }
+    }
+    
+    for (const r of q.requirements) {
+      warehouse[r.item] -= r.qty;
+    }
+    
+    coins += q.rewardCoins;
+    addCrates(q.rewardCrates);
+    
+    let rewardMsg = `✨ ${q.name} благодарит вас! +${q.rewardCoins}💰`;
+    if (q.rewardCrates > 0) rewardMsg += ` и +${q.rewardCrates}📦`;
+    notify(rewardMsg, 3500);
+    
+    quests = quests.filter(x => x.id !== id);
+
+    // Выполнение квеста усложняет будущие
+    questDifficultyLevel++;
+    
+    if (quests.length < 2) {
+      quests.push(generateQuest());
+    }
+    updateUI();
+  }
+
+  function plant(t,c,cc){
+    if(tutorialActive){ notify('Сначала пройдите обучение'); return; }
+    coins += cc;
+    let p=0;
+    for(let i=0;i<field.length&&p<c;i++){
+      if(!field[i] && !droughtFields[i]){
+        const days = (t==='wheat'?2 : t==='potato'?3 : t==='eggplant'?2 : t==='sunflower'?4 : t==='tulip'?3 : 4);
+        let rem;
+        if(t==='eggplant'){ rem = artifacts.some(a=>a.id==='eggplant_boost') ? 5 : 3; } else rem = 1;
+        let daysLeft = days;
+        let obj;
+        if(fertilizedFields[i]){
+          daysLeft = Math.max(1, days - 1);
+          obj = {type:t, daysLeft:daysLeft, remainingHarvests: rem, fertilized:true};
+        } else {
+          obj = {type:t, daysLeft:days, remainingHarvests: rem};
+        }
+        artifacts.forEach(a=>{ if(a.applyOnPlant){ try{ a.applyOnPlant(t,obj); }catch(e){} } });
+        field[i] = obj; p++;
+      }
+    }
+    updateUI();
+  }
+
+  function gainAnimal(t,c,cc){
+    if(tutorialActive){ notify('Сначала пройдите обучение'); return; }
+    coins += cc;
+    let p=0;
+    for(let i=0;i<pens.length && p<c;i++){
+      if(!pens[i]){
+        if(t==='cow') pens[i] = {type:t,bornOnDay:day};
+        else if(t==='chicken'){ const eatPeriod = artifacts.some(a=>a.id==='chicken_diet') ? 3 : 2; pens[i] = {type:t,bornOnDay:day,eatIn:eatPeriod}; }
+        else if(t==='pig'){ pens[i] = {type:t,bornOnDay:day,eatIn:3,price:2}; }
+        else if(t==='goat'){ pens[i] = {type:'goat', bornOnDay:day, eatIn:3, price:2}; }
+        p++;
+      }
+    }
+    updateUI();
+  }
+
+  function wolvesAttack(n,g){ coins += g; for(let k=0;k<n;k++){ const idxs=pens.map((p,i)=>p?i:null).filter(x=>x!==null); if(!idxs.length) break; const pick=idxs[Math.floor(Math.random()*idxs.length)]; pens[pick]=null; } updateUI(); }
+
+  function chooseCard(c){ 
+    if(gameOver) return; 
+    if(tutorialActive){ notify('Завершите обучение прежде чем продолжить'); return; } 
+    if(artifactChoices){ notify('Сначала выберите артефакт-награду'); return; } 
+    if(packChoices){ notify('Сначала выберите пак'); return; }
+    
+    const delta = getCardCoinDelta(c);
+    const tax = computeTax();
+    const projected = coins + delta - tax;
+    if (projected < 0) {
+      if (!bankruptcyWarningShown) {
+        showWarning(`⚠️ Опасно! После этого хода и налога (${tax}💰) вы уйдёте в минус (${projected}💰). Нажмите действие ещё раз чтобы рискнуть и проиграть.`);
+        bankruptcyWarningShown = true;
+        return;
+      }
+      // Повторное нажатие: действие выполняется, игрок может проиграть
+    }
+    
+    c.fn(); 
+    endOfDay(); 
+  }
+
+  function chooseArtifactFromReward(a){ if(tutorialActive){ notify('Завершите обучение прежде чем выбрать артефакт'); return; } grantArtifact(a); artifactChoices = null; updateUI(); }
+
+  function grantArtifact(a){
+    if(artifacts.find(x=>x.id===a.id)){
+      const alt = 6 + Math.floor(Math.random()*7);
+      coins += alt;
+      notify(`Артефакт ${a.name} уже есть — вместо него +${alt} монет`);
+      return;
+    }
+    artifacts.push(a);
+    if(a.id === 'add_pen'){
+      pens.push(null);
+      notify('Добавлен слот загона');
+    }
+    if(a.onPick) try{ a.onPick(); }catch(e){}
+    updateUI();
+  }
+
+  function endOfDay(){
+    Object.keys(droughtFields).forEach(k=>{
+      droughtFields[k]--;
+      if(droughtFields[k] <= 0) delete droughtFields[k];
+    });
+
+    for(const c of field){ if(c) c.daysLeft--; }
+
+    const empty = field.filter((x,i)=>!x && !droughtFields[i]).length;
+
+    const cowIdxs = pens.map((p,i)=>p&&p.type==='cow'&&p.bornOnDay<day?i:null).filter(x=>x!==null);
+    if(cowIdxs.length > empty){ let shortage = cowIdxs.length - empty; for(let i=0;i<shortage;i++){ if(warehouse.hay && warehouse.hay > 0){ warehouse.hay--; shortage--; notify('Корову спасло сено из склада'); } else { const dieIdx = cowIdxs.pop(); if(dieIdx!==undefined && pens[dieIdx]) { pens[dieIdx] = null; notify('Корову не удалось накормить — погибла'); } } } }
+
+    pens.forEach((p,i) => {
+      if(!p) return;
+      if(p.type==='cow' && p.bornOnDay<day) warehouse.milk++;
+      if(p.type==='chicken' && p.bornOnDay<day){
+        warehouse.eggs++;
+        p.eatIn--;
+        if(p.eatIn<=0){
+          const eatPeriod = artifacts.some(a=>a.id==='chicken_diet') ? 3 : 2;
+          if(warehouse.wheat>0){ warehouse.wheat--; p.eatIn = eatPeriod; }
+          else if(warehouse.sunflower>0){ warehouse.sunflower--; p.eatIn = eatPeriod; }
+          else { pens[i]=null; notify('Курица погибла от голода'); }
+        }
+      }
+      if(p.type==='pig' && p.bornOnDay<day){
+        if(p.price >= 1024){ p.frozenGrowth = true; }
+        if(!p.frozenGrowth){
+          p.eatIn--;
+          if(p.eatIn<=0){
+            if(warehouse.potato>0){ warehouse.potato--; p.price *= 2; if(p.price >= 1024){ p.price = 1024; p.frozenGrowth = true; notify('Свинья достигла максимальной стоимости — рост остановлен'); } p.eatIn=3; } else { pens[i]=null; notify('Свинья погибла от голода'); }
+          }
+        }
+      }
+      if(p.type==='goat' && p.bornOnDay<day){ warehouse.milk++; if(!p.frozenGrowth){ p.eatIn--; } if(p.eatIn<=0){ if(warehouse.cabbage>0){ warehouse.cabbage--; p.price = (p.price||2) + 13; p.eatIn = 3; } else { pens[i]=null; notify('Козёл погиб от голода'); } } }
+    });
+
+    if(empty >= 3) { warehouse.hay = (warehouse.hay||0) + 1; }
+
+    artifacts.forEach(a=>{ if(a.applyOnDaily){ try { a.applyOnDaily({day,coins,warehouse,pens,field,availablePlants:getAvailablePlantTypes()}); } catch(e){} } });
+
+    artifacts.forEach(a=>{ if(a.applyOnEndDay){ try{ const res = a.applyOnEndDay({day,warehouse,availablePlants:getAvailablePlantTypes()}); if(typeof res === 'number' && res>0){ addCrates(res); notify('Артефакт принес дополнительный ящик! 🔑'); } }catch(e){} } });
+
+    if(pickedPacks.has('tulip_pack')){
+      const dir = Math.random() < 0.5 ? -1 : 1;
+      const newPrice = Math.max(2, Math.min(20, tulipPrice + dir));
+      tulipLastChange = newPrice === tulipPrice ? 0 : (newPrice > tulipPrice ? 1 : -1);
+      tulipPrice = newPrice;
+    }
+
+    const tax = computeTax(); if(tax>0) coins -= tax;
+    if(coins < 0){ gameOver = true; alert('Игра окончена — недостаточно монет'); return; }
+
+    // рост прогрессивного налога на следующий день
+    growTax();
+
+    meter += 10; if(meter > 100) meter = 100;
+
+    if(meter >= 70){
+      const nextDec = Math.ceil(day/10)*10;
+      if(!upcomingDisasters.find(d => d.day === nextDec)){
+        const types = ['wolves','locusts','raiders','drought'];
+        const t = types[Math.floor(Math.random()*types.length)];
+        upcomingDisasters.push({ day: nextDec, type: t });
+        notify(`Беда запланирована на день ${nextDec} (${t === 'wolves' ? 'волки' : t==='locusts' ? 'саранча' : t==='drought' ? 'засуха' : 'грабители'})`);
+      }
+    }
+
+    // Квесты: таймеры, провал усложняет будущие
+    quests.forEach(q => q.daysLeft--);
+    const expired = quests.filter(q => q.daysLeft <= 0);
+    expired.forEach(q => {
+      notify(`⏰ Квест от "${q.name}" провален — срок истёк!`, 3200);
+      questDifficultyLevel++; // невыполнение тоже усложняет
+    });
+    quests = quests.filter(q => q.daysLeft > 0);
+    
+    while (quests.length < 2) {
+      if (Math.random() < 0.85 || quests.length === 0) {
+        quests.push(generateQuest());
+      } else break;
+    }
+
+    day++;
+    processDisastersForDay(day);
+
+    // Сброс предупреждения о банкротстве после успешного дня
+    bankruptcyWarningShown = false;
+
+    if(day % 15 === 0){
+      showPackChoices();
+      updateUI();
+      return;
+    }
+
+    drawCards(); updateUI();
+  }
+
+  function harvest(i){
+    const c=field[i]; if(!c||c.daysLeft>0) return;
+    let gained = 1;
+    artifacts.forEach(a=>{ if(a.applyOnHarvest){ try{ gained += a.applyOnHarvest(c.type) || 0 } catch(e){} } });
+
+    if(c.fertilized){
+      gained = gained * 2;
+    }
+
+    if(c.type === 'eggplant'){
+      c.remainingHarvests = c.remainingHarvests || 1;
+      warehouse.eggplant = (warehouse.eggplant || 0) + gained;
+      c.remainingHarvests--;
+      if(c.remainingHarvests > 0){ c.daysLeft = 2; }
+      else { field[i] = null; }
+    }
+    else if(c.type === 'sunflower'){
+      const base = 4;
+      let extra = 0;
+      artifacts.forEach(a=>{ if(a.applyOnHarvest){ try{ extra += a.applyOnHarvest(c.type) || 0 } catch(e){} } });
+      const total = (base + extra) * (c.fertilized ? 2 : 1);
+      warehouse.sunflower = (warehouse.sunflower||0) + total;
+      field[i] = null;
+      notify(`Собрано подсолнухов: ${total}`);
+    }
+    else {
+      warehouse[c.type] = (warehouse[c.type] || 0) + gained;
+      field[i] = null;
+    }
+
+    if(fertilizedFields[i]){
+      fertilizedFields[i].lives--;
+      if(fertilizedFields[i].lives <= 0) fertilizedFields[i] = null;
+    }
+
+    updateUI();
+    if(Math.random() < 0.08){ addCrates(1); notify('Найден запечатанный ящик при сборе! 🎁'); }
+    updateUI();
+  }
+
+  function sellItem(t){
+    if(tutorialActive){ notify('Завершите обучение прежде чем продавать'); return; }
+    let qty = sellAllSettings[t] ? (warehouse[t]||0) : 1;
+    if(qty <= 0) { notify('Нет товара для продажи'); return; }
+    const initialQty = qty;
+    for(let i=0;i<qty;i++){
+      if((warehouse[t]||0) <= 0) break;
+      warehouse[t]--;
+      let base;
+      if(t==='eggplant') base = 3; else if(t==='tulip') base = tulipPrice;
+      else if(t==='sunflower') base = 2;
+      else base = t==='potato'?4:t==='cabbage'?8:t==='milk'||t==='wheat'?1:2;
+      artifacts.forEach(a=>{ if(a.applyOnSell){ try{ base = a.applyOnSell(t, base); } catch(e){} } });
+      coins += base;
+    }
+    if(sellAllSettings[t] && artifacts.some(a=>a.id==='bulk_bonus')){
+      const sold = initialQty - (warehouse[t]||0);
+      const bonus = Math.floor(sold/10) * 5;
+      if(bonus > 0){ coins += bonus; notify(`Бонус за оптовую продажу: +${bonus} монет`); }
+    }
+    updateUI();
+  }
+
+  function sellPig(i){
+    const p = pens[i];
+    if(!p || p.type!=='pig') return;
+    coins += p.price;
+    pens[i] = null;
+    updateUI();
+  }
+
+  function sellGoat(i){
+    const p = pens[i];
+    if(!p || p.type!=='goat') return;
+    coins += (p.price || 2);
+    pens[i] = null;
+    updateUI();
+  }
+
+  function openCrate(){ if(tutorialActive){ notify('Завершите обучение прежде чем открывать ящики'); return; } if(sealedCrates <= 0){ notify('Ящиков нет.'); return; } sealedCrates--; const roll = Math.random(); if(roll < 0.18){ const animals = ['chicken','cow','pig']; const weights = [0.7, 0.25, 0.05]; const pick = weightedPick(animals, weights); gainAnimal(pick,1,0); notify(`В ящике найдено случайное животное: ${pick === 'chicken' ? 'курица 🐔' : pick === 'cow' ? 'корова 🐄' : 'свинья 🐖'}`); } else if(roll < 0.36){ coins += 7; notify('В ящике: +7 монет'); } else if(roll < 0.58){ coins += 10; notify('В ящике: +10 монет'); } else if(roll < 0.72){ coins += 12; notify('В ящике: +12 монет'); } else if(roll < 0.82){ warehouse.wheat = (warehouse.wheat||0) + 3; notify('В ящике: 3 пшеницы'); } else if(roll < 0.92){ warehouse.potato = (warehouse.potato||0) + 2; notify('В ящике: 2 картошки'); } else if(roll < 0.98){ warehouse.cabbage = (warehouse.cabbage||0) + 1; notify('В ящике: 1 капуста'); } else { const art = getRandomArtifactFromPool(); if(art){ grantArtifact(art); notify(`В ящике найден артефакт: ${art.icon} ${art.name}`); } else { coins += 6; notify('В ящике небольшая награда: +6 монет'); } } updateUI(); }
+
+  function getRandomArtifactFromPool(){
+    const notOwned = availableArtifacts.filter(ap => !artifacts.find(a=>a.id===ap.id));
+    const list = notOwned.length ? notOwned : availableArtifacts;
+    if(!list.length) return null;
+    const pick = list[Math.floor(Math.random()*list.length)];
+    return Object.assign({}, pick);
+  }
+
+  function sellArtifact(id){
+    const idx = artifacts.findIndex(a=>a.id===id);
+    if(idx<0) return;
+    const art = artifacts[idx];
+    if(art.id==='add_pen'){
+      const lastIndex = pens.length - 1;
+      if(lastIndex >= 3 && pens[lastIndex]){ notify('Нельзя продать: дополнительный слот загона занят'); return; }
+    }
+    const reward = 6 + Math.floor(Math.random()*7);
+    coins += reward;
+    addCrates(1);
+    if(art.id==='add_pen'){
+      const lastIndex = pens.length - 1;
+      if(!pens[lastIndex]) { pens.pop(); notify('Дополнительный слот загона убран'); }
+    }
+    artifacts.splice(idx,1);
+    notify(`Артефакт продан: +${reward} монет и получен(ы) ящик(и)`);
+    updateUI();
+  }
+
+  function processDisastersForDay(currentDay){
+    const toApply = upcomingDisasters.filter(d => d.day === currentDay);
+    if(toApply.length === 0) return;
+    toApply.forEach(d => {
+      if(d.type === 'wolves'){ const n = 1 + Math.floor(Math.random()*3); wolvesAttack(n, 0); notify(`Нападение волков! ${n} волков напали и убили животных.`); }
+      else if(d.type === 'locusts'){ let lost = 0; for(let i=0;i<field.length;i++){ if(field[i]){ if(Math.random() < 0.75){ field[i] = null; lost++; } } } notify(`Саранча! Уничтожено засеянных клеток: ${lost}`);
+      }
+      else if(d.type === 'raiders'){ ['wheat','potato','eggplant','cabbage','milk','eggs','hay','sunflower'].forEach(k=>{ const q = warehouse[k] || 0; const taken = Math.floor(q / 2); warehouse[k] = q - taken; }); notify('Грабители прошлись по складу — половина товаров утеряна'); }
+      else if(d.type === 'drought'){
+        const valid = Array.from({length:field.length},(_,i)=>i).filter(i=>!droughtFields[i]);
+        if(valid.length === 0) { notify('Засуха произошла, но свободных полей не оказалось'); }
+        else {
+          for (let i = valid.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [valid[i], valid[j]] = [valid[j], valid[i]]; }
+          const picks = valid.slice(0, Math.min(2, valid.length));
+          picks.forEach(idx => {
+            droughtFields[idx] = 5;
+            try{ fertilizedFields[idx] = null; }catch(e){}
+            if(field[idx]) { field[idx] = null; notify(`Засуха! Поле №${idx+1} высохло — растение уничтожено.`); } else { notify(`Засуха! Поле №${idx+1} засохло на 5 ходов.`); }
+          });
+        }
+      }
+
+      const choices = rollArtifactChoices(3);
+      if (choices) {
+        artifactChoices = choices;
+        notify('После беды доступны артефакты — выберите один (под картами).');
+      } else {
+        artifactChoices = null;
+      }
+
+      meter = 0;
+    });
+    upcomingDisasters = upcomingDisasters.filter(d => d.day !== currentDay);
+    updateUI();
+  }
+
+  function showPackChoices(){
+    const candidates = packs.filter(p=>!pickedPacks.has(p.id));
+    if(candidates.length === 0){
+      notify('Нет доступных паков — все паки уже добавлены.');
+      packChoices = null;
+      drawCards();
+      updateUI();
+      return;
+    }
+    const pool = candidates.slice();
+    const picks = [];
+    while(picks.length < 2 && pool.length>0){ const i = Math.floor(Math.random()*pool.length); const p = pool.splice(i,1)[0]; picks.push(p); }
+    packChoices = picks;
+    renderPackModal();
+  }
+
+  function renderPackModal(){
+    const overlay = document.createElement('div'); overlay.className='overlay-block'; overlay.id = 'packOverlay';
+    const panel = document.createElement('div'); panel.className='panel'; panel.style.maxWidth='760px'; panel.style.display='flex'; panel.style.flexDirection='column';
+    panel.innerHTML = `<div style="text-align:center"><h3>🎁 Выберите пак</h3><div class="note">Выбор пака добавит новые карты в пул и новые артефакты.</div></div>`;
+    const grid = document.createElement('div'); grid.className='packs-grid';
+    packChoices.forEach(p=>{
+      const card = document.createElement('div'); card.className='pack-card';
+      const disabled = pickedPacks.has(p.id);
+      card.innerHTML = `<h4>${p.name}</h4><p>${p.desc}</p>`;
+      card.addEventListener('click', ()=>{ if(!disabled) { pickPack(p.id); document.body.removeChild(overlay); } });
+      if(disabled){ card.style.opacity = '0.5'; }
+      grid.appendChild(card);
+    });
+    panel.appendChild(grid);
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+  }
+
+  function pickPack(packId){ if(tutorialActive){ notify('Завершите обучение прежде чем выбирать пак'); return; } const p = packs.find(x=>x.id===packId); if(!p) return;
+    p.cards.forEach(c=> {
+      if(!availableCards.find(ac => ac.id === c.id) && !baseCards.find(bc => bc.id === c.id)){
+        availableCards.push(c);
+      }
+    });
+    p.artifacts.forEach(a=>{
+      if(!availableArtifacts.find(aa => aa.id === a.id) && !artifacts.find(ar => ar.id === a.id)){
+        availableArtifacts.push(a);
+      }
+    });
+    if(p.onPick) try{ p.onPick(); } catch(e){}
+    pickedPacks.add(p.id);
+    packChoices = null;
+    notify(`Выбран пак: ${p.name}`);
+    drawCards();
+    updateUI();
+  }
+
+  const fieldPrices = [0,0,0,0,15,20,25,30];
+  function updateBuyFieldButton(){ const btn = el('buyField'); const nextIndex = field.length + 1; if(nextIndex > 8){ btn.disabled = true; btn.textContent = '🌾 Полей нет'; return; } const price = fieldPrices[nextIndex-1] || 999; btn.disabled = coins < price || (coins - price - computeTax() < 0); btn.textContent = `🌾 Поле (${price}💰)`; }
+  function buyField(){ 
+    if(tutorialActive){ notify('Завершите обучение прежде чем покупать поле'); return; } 
+    const nextIndex = field.length + 1; 
+    if(nextIndex > 8) { notify('Нельзя купить больше 8 полей'); return; } 
+    const price = fieldPrices[nextIndex-1] || 999; 
+    if(coins < price){ notify('Недостаточно монет'); return; } 
+    const tax = computeTax();
+    if (coins - price - tax < 0) {
+      notify(`⚠️ После покупки и налога (${tax}💰) вы уйдёте в минус!`);
+      return;
+    }
+    coins -= price; field.push(null); fertilizedFields.push(null); notify(`Куплено поле №${field.length} за ${price} монет`); updateUI(); 
+  }
+
+  function updateBuyPenButton(){ const btn = el('buyPen'); if(pensBoughtCount >= maxPensBuy){ btn.disabled = true; btn.textContent = '🏚️ Лимит'; return; } btn.disabled = coins < 15 || (coins - 15 - computeTax() < 0); btn.textContent = `🏚️ Загон (15💰)`; }
+  function buyPen(){ 
+    if(tutorialActive){ notify('Завершите обучение прежде чем покупать загон'); return; } 
+    const price = 15; 
+    if(pensBoughtCount >= maxPensBuy){ notify('Вы достигли лимита покупок загонов'); return; } 
+    if(coins < price){ notify('Недостаточно монет для загона'); return; } 
+    const tax = computeTax();
+    if (coins - price - tax < 0) {
+      notify(`⚠️ После покупки и налога (${tax}💰) вы уйдёте в минус!`);
+      return;
+    }
+    coins -= price; pens.push(null); pensBoughtCount++; notify('Куплен новый загон (+1)'); updateUI(); 
+  }
+
+  function drawCards(){ currentCards=[]; if(availableCards.length===0){ availableCards = baseCards.slice(); } for(let i=0;i<3;i++){ currentCards.push(availableCards[Math.floor(Math.random()*availableCards.length)]);} updateUI(); }
+
+  function triggerDroughtCard(duration){
+    const valid = Array.from({length:field.length},(_,i)=>i).filter(i=>!droughtFields[i]);
+    if(valid.length === 0) { notify('Нет доступного поля для засухи'); return; }
+    for (let i = valid.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [valid[i], valid[j]] = [valid[j], valid[i]]; }
+    const picks = valid.slice(0, Math.min(2, valid.length));
+    picks.forEach(idx => {
+      droughtFields[idx] = duration;
+      try{ fertilizedFields[idx] = null; }catch(e){}
+      if(field[idx]){ field[idx] = null; notify(`Засуха! Поле №${idx+1} высохло на ${duration} ходов — растение уничтожено.`); } else { notify(`Засуха! Поле №${idx+1} засохло на ${duration} ходов.`); }
+    });
+    updateUI();
+  }
+
+  function triggerDroughtCardSingle(duration){
+    const valid = Array.from({length:field.length},(_,i)=>i).filter(i=>!droughtFields[i]);
+    if(valid.length === 0) { notify('Нет доступного поля для засухи'); return; }
+    const idx = valid[Math.floor(Math.random()*valid.length)];
+    droughtFields[idx] = duration;
+    try{ fertilizedFields[idx] = null; }catch(e){}
+    if(field[idx]){ field[idx] = null; notify(`Засуха! Поле №${idx+1} высохло на ${duration} ходов — растение уничтожено.`); } else { notify(`Засуха! Поле №${idx+1} засохло на ${duration} ходов.`); }
+    updateUI();
+  }
+
+
+  function updateUI(){
+    el('day').textContent=day; el('coins').textContent=coins; el('tax').textContent=computeTax();
+    const threshold = 9 + computeTax(); const coinsEl = el('coins'); if(coins < threshold) coinsEl.classList.add('coins-low'); else coinsEl.classList.remove('coins-low');
+
+    const fld=el('field'); const cols = Math.min(4, field.length) || 1; fld.style.gridTemplateColumns = `repeat(${cols}, 1fr)`; fld.innerHTML='';
+    while(fertilizedFields.length < field.length) fertilizedFields.push(null);
+    while(fertilizedFields.length > field.length) fertilizedFields.pop();
+
+    field.forEach((cell,i)=>{
+      const div=document.createElement('div');
+      const isDrought = !!droughtFields[i];
+      const isFertile = !!fertilizedFields[i];
+      const willBeInteractive = !!cell && !isDrought;
+      const readyClass = (cell && cell.daysLeft<=0 && !isDrought) ? ' ready' : '';
+      let baseClass = 'slot';
+      if(!cell) baseClass += ' empty';
+      if(isFertile) baseClass += ' fertile';
+      if(isDrought) baseClass += ' drought';
+      if(willBeInteractive) baseClass += ' interactive';
+      div.className = baseClass + (cell ? readyClass : '');
+      if(!cell){
+        div.addEventListener('click', ()=>{
+          if(tutorialActive){ notify('Завершите обучение прежде чем взаимодействовать'); return; }
+          if(isDrought){ notify('Поле засохло и недоступно'); return; }
+          if((warehouse.fertilizer||0) > 0){
+            warehouse.fertilizer--;
+            fertilizedFields[i] = { lives: 2 };
+            notify('Поле удобрено (2 жизни)');
+            updateUI();
+            return;
+          } else {
+            notify('Удобрений нет (нажмите карту удобрения чтобы получить)');
+          }
+        });
+      } else {
+        const count=document.createElement('div'); count.className='count';
+        if(cell.type === 'eggplant'){
+          const rem = (cell.remainingHarvests !== undefined) ? cell.remainingHarvests : 1;
+          count.textContent = `×${rem}`;
+          const em=document.createElement('div'); em.className='emoji'; em.textContent=iconMap[cell.type]||cell.type;
+          const small = document.createElement('div'); small.className='small-note'; small.textContent = cell.daysLeft>0 ? `⏳ ${cell.daysLeft} ход(а)` : '✨ Готово!';
+          div.appendChild(count); div.appendChild(em); div.appendChild(small);
+        } else {
+          count.textContent = (cell.daysLeft>0?cell.daysLeft:'');
+          const em=document.createElement('div'); em.className='emoji'; em.textContent=iconMap[cell.type]||cell.type;
+          const small = document.createElement('div'); small.className='small-note'; small.textContent = cell.daysLeft>0 ? `⏳ ${cell.daysLeft}` : '✨ Готово!';
+          div.appendChild(count); div.appendChild(em); div.appendChild(small);
+        }
+        div.addEventListener('click', ()=>{
+          if(tutorialActive){ notify('Завершите обучение прежде чем взаимодействовать'); return; }
+          if(isDrought){ notify('Поле засохло и недоступно'); return; }
+          if(cell.daysLeft <= 0) harvest(i);
+          else { field[i] = null; notify('Растение срезано — ничего не получено'); updateUI(); }
+        });
+      }
+      fld.appendChild(div);
+    });
+
+    const pn=el('pen'); pn.innerHTML=''; pens.forEach((p,i)=>{
+      const d=document.createElement('div'); d.className='stall';
+      if(!p){ d.classList.add('empty-stall'); }
+      else {
+        const em=document.createElement('div'); em.className='animal'; em.textContent=iconMap[p.type]||p.type; d.appendChild(em);
+        const showTimer = (p.eatIn !== undefined) && !(p.type==='pig' && p.frozenGrowth);
+        if(showTimer){ const timer=document.createElement('div'); timer.className='timer'; timer.textContent=(p.type==='cow')?'':(p.eatIn? p.eatIn : '—'); d.appendChild(timer); }
+        if(p.type==='pig'){ const btn=document.createElement('button'); btn.className='sell-btn'; btn.textContent=(p.price||2)+'💰'; btn.addEventListener('click',(e)=>{ e.stopPropagation(); sellPig(i); }); d.appendChild(btn); }
+        if(p.type==='goat'){ const btn=document.createElement('button'); btn.className='sell-btn'; btn.textContent=(p.price||2)+'💰'; btn.addEventListener('click',(e)=>{ e.stopPropagation(); sellGoat(i); }); d.appendChild(btn); }
+        if(p.type==='pig' && p.frozenGrowth){ d.classList.add('pig-max'); }
+        d.addEventListener('click', ()=>{ if(tutorialActive){ notify('Завершите обучение прежде чем взаимодействовать'); return; } if(p && (p.type==='chicken' || p.type==='cow')){ pens[i] = null; notify(`${p.type === 'chicken' ? 'Курица' : 'Корова'} удалена`); updateUI(); } });
+      }
+      pn.appendChild(d);
+    });
+
+    const cr=el('cards'); cr.innerHTML='';
+    currentCards.forEach(c=>{
+      const cc=document.createElement('div'); cc.className='card'; cc.textContent=(c.icon||[]).join(' '); cc.title = c.name || '';
+      cc.addEventListener('click',()=>{ if(!gameOver) chooseCard(c); });
+      if(artifactChoices || packChoices || tutorialActive) cc.style.opacity='0.5';
+      cr.appendChild(cc);
+    });
+
+    const ac = el('artifactChoicesContainer'); ac.innerHTML='';
+    const ap = el('artifactPanel'); ap.style.display = artifactChoices ? 'block' : 'none';
+    if(artifactChoices){
+      artifactChoices.forEach(a=>{
+        if(artifacts.find(x=>x.id===a.id)) return;
+        const card=document.createElement('div'); card.className='artifact-card';
+        card.innerHTML = `<div class="icon">${a.icon}</div><div class="name">${a.name}</div><div class="desc">${a.desc||''}</div>`;
+        card.addEventListener('click', ()=> chooseArtifactFromReward(a));
+        ac.appendChild(card);
+      });
+    }
+
+    const wh=el('warehouse'); wh.innerHTML='';
+    const items = [
+      {k:'wheat',emoji:'🌾',price:1},
+      {k:'potato',emoji:'🥔',price:4},
+      {k:'eggplant',emoji:'🍆',price:3},
+      {k:'cabbage',emoji:'🥬',price:8},
+      {k:'milk',emoji:'🥛',price:1},
+      {k:'eggs',emoji:'🥚',price:2},
+      {k:'hay',emoji:'🌿',price:null}
+    ];
+    if(warehouse.hasOwnProperty('sunflower')) items.push({k:'sunflower',emoji:'🌻',price:2});
+    if(warehouse.hasOwnProperty('fertilizer')) items.push({k:'fertilizer',emoji:'🧪',price:null});
+    if(warehouse.hasOwnProperty('tulip')) items.push({k:'tulip',emoji:'🌷',price: null});
+
+    items.forEach(it=>{
+      const div=document.createElement('div'); div.className='wh-item';
+      const left=document.createElement('div'); left.className='wh-left';
+      left.innerHTML=`<div class='wh-emoji'>${it.emoji}</div><div class='wh-count'>${warehouse[it.k] || 0}</div>`; div.appendChild(left);
+      const rightWrap = document.createElement('div'); rightWrap.style.display='flex'; rightWrap.style.alignItems='center'; rightWrap.style.gap='8px';
+      if(it.k !== 'hay' && it.k !== 'fertilizer'){
+        const btn=document.createElement('button'); btn.className='sell-btn';
+        if(it.k === 'tulip'){
+          const arrow = tulipLastChange > 0 ? '▲' : (tulipLastChange < 0 ? '▼' : '');
+          btn.textContent = (tulipPrice) + '💰 ' + arrow;
+          btn.addEventListener('click', ()=> { sellItem('tulip'); });
+        } else {
+          btn.textContent=(it.price)+'💰';
+          btn.addEventListener('click', ()=> { sellItem(it.k); });
+        }
+        rightWrap.appendChild(btn);
+        const label = document.createElement('label'); label.className='sell-all';
+        const cb = document.createElement('input'); cb.type='checkbox'; cb.checked = !!sellAllSettings[it.k];
+        cb.addEventListener('change', (e)=>{ sellAllSettings[it.k] = e.target.checked; });
+        label.appendChild(cb); const span = document.createElement('span'); span.textContent = 'всё'; label.appendChild(span);
+        rightWrap.appendChild(label);
+      } else {
+        const nop=document.createElement('div'); nop.className='small-muted'; nop.textContent = it.k === 'fertilizer' ? '💡 Для удобрения' : '🐄 Сено'; rightWrap.appendChild(nop);
+      }
+      div.appendChild(rightWrap); wh.appendChild(div);
+    });
+
+    const openBtn = el('openCrate');
+    if (sealedCrates > 0) {
+      openBtn.classList.remove('hidden-crate');
+      openBtn.classList.add('has-crate');
+    } else {
+      openBtn.classList.add('hidden-crate');
+      openBtn.classList.remove('has-crate');
+    }
+    el('crates').textContent = sealedCrates;
+
+    el('meterFill').style.width = Math.min(100, meter) + '%';
+    const daysTo = Math.ceil((100 - meter) / 10);
+    el('streakNote').textContent = meter >= 100 ? '⚠️ Беда запланирована!' : `До беды: ${daysTo} ход(ов)`;
+
+    const artList = el('artifactList'); artList.innerHTML='';
+    if(artifacts.length===0){ artList.innerHTML = '<div class="small-muted" style="padding: 6px 0; font-style: italic;">Артефактов пока нет — переживите беду или выполните постоянный заказ</div>'; } else {
+      artifacts.forEach(a=>{
+        const node = document.createElement('div'); node.className='artifact';
+        node.innerHTML = `<div style="display:flex;gap:10px;align-items:center"><div style="font-size:24px">${a.icon}</div><div><div style="font-weight:700; font-family: var(--font-medieval); font-size: 15px;">${a.name}</div><div class="small-muted">${a.desc||''}</div></div></div><div><button class="sell-btn" data-id="${a.id}">💰 Продать</button></div>`;
+        artList.appendChild(node);
+        node.querySelector('button').addEventListener('click',()=>sellArtifact(a.id));
+      });
+    }
+
+    const disList = el('disasters'); disList.innerHTML='';
+    if(upcomingDisasters.length>0){
+      const next = upcomingDisasters.slice().sort((a,b)=>a.day-b.day)[0];
+      const diff = next.day - day;
+      const t = next.type;
+      const icon = t==='wolves'?'🐺': t==='locusts'?'🦗': t==='raiders'?'🏴‍☠️': t==='drought'?'🌵':'❓';
+      const desc = t==='wolves'?'нападение волков (1-3)': t==='locusts'?'саранча (75% шанс уничтожить каждую засеянную клетку)': t==='drought'?'засуха (поле недоступно 5 ходов)':'грабители (половина склада)';
+      const item=document.createElement('div'); item.className='disaster-item';
+      item.innerHTML = `<div>${icon} ${desc}</div><div class="small-muted" style="font-weight:700;">День ${next.day}</div>`;
+      if(diff <= 2){ item.classList.add('disaster-soon'); }
+      disList.appendChild(item);
+    } else {
+      disList.innerHTML = '<div class="small-muted" style="padding: 6px 0; font-style: italic;">Пока никаких бед не предвидится</div>';
+    }
+
+    // ====== КВЕСТЫ ====== */
+    const qList = el('questsList');
+    qList.innerHTML = '';
+
+    // Бессрочный квест (всегда сверху, золотая рамка)
+    if (permanentQuest) {
+      const pq = permanentQuest;
+      const canComplete = pq.requirements.every(r => (warehouse[r.item] || 0) >= r.qty);
+      let reqHtml = pq.requirements.map(r => {
+        const have = warehouse[r.item] || 0;
+        const ok = have >= r.qty;
+        const emoji = iconMap[r.item] || '❓';
+        return `<div class="quest-req ${ok ? 'ok' : 'missing'}"><span>${emoji} ${r.qty}</span><span class="have">(${have})</span></div>`;
+      }).join('');
+      const pdiv = document.createElement('div');
+      pdiv.className = 'quest-card permanent';
+      pdiv.innerHTML = `
+        <div class="quest-head">
+          <span class="quest-npc">🏛️</span>
+          <span class="quest-name">Постоянный заказ (ур. ${permanentQuestLevel})</span>
+          <span class="quest-timer" style="background:linear-gradient(180deg,var(--accent-gold),#a67c00)">∞</span>
+        </div>
+        <div class="quest-reqs">${reqHtml}</div>
+        <div class="quest-footer">
+          <span class="quest-reward"><span class="quest-reward-artifact">🧿 Артефакт</span></span>
+          <button class="sell-btn quest-btn" ${!canComplete ? 'disabled' : ''}>📜 Отдать</button>
+        </div>
+      `;
+      pdiv.querySelector('.quest-btn').addEventListener('click', acceptPermanentQuest);
+      qList.appendChild(pdiv);
+    }
+
+    // Обычные квесты
+    if (quests.length === 0) {
+      const emptyNote = document.createElement('div');
+      emptyNote.className = 'small-muted';
+      emptyNote.style.padding = '6px 0';
+      emptyNote.style.fontStyle = 'italic';
+      emptyNote.textContent = 'Квестов пока нет — жители скоро придут';
+      qList.appendChild(emptyNote);
+    } else {
+      quests.forEach(q => {
+        const div = document.createElement('div');
+        div.className = 'quest-card';
+        
+        const canComplete = q.requirements.every(r => (warehouse[r.item] || 0) >= r.qty);
+        const isUrgent = q.daysLeft <= 3;
+        
+        let reqHtml = q.requirements.map(r => {
+          const have = warehouse[r.item] || 0;
+          const ok = have >= r.qty;
+          const emoji = iconMap[r.item] || '❓';
+          return `<div class="quest-req ${ok ? 'ok' : 'missing'}">
+            <span>${emoji} ${r.qty}</span>
+            <span class="have">(${have})</span>
+          </div>`;
+        }).join('');
+        
+        div.innerHTML = `
+          <div class="quest-head">
+            <span class="quest-npc">${q.npc}</span>
+            <span class="quest-name">${q.name}</span>
+            <span class="quest-timer ${isUrgent ? 'urgent' : ''}">⏳ ${q.daysLeft} дн.</span>
+          </div>
+          <div class="quest-reqs">${reqHtml}</div>
+          <div class="quest-footer">
+            <span class="quest-reward">
+              <span class="quest-reward-coins">+${q.rewardCoins}💰</span>
+              ${q.rewardCrates > 0 ? `<span class="quest-reward-crates">+${q.rewardCrates}📦</span>` : ''}
+            </span>
+            <button class="sell-btn quest-btn" ${!canComplete ? 'disabled' : ''}>📜 Отдать</button>
+          </div>
+        `;
+        
+        const btn = div.querySelector('.quest-btn');
+        if (btn) btn.addEventListener('click', () => acceptQuest(q.id));
+        
+        qList.appendChild(div);
+      });
+    }
+
+    updateBuyFieldButton(); updateBuyPenButton();
+  }
+
+  function init(){ 
+    setupBaseCards(); 
+    setupBaseArtifacts(); 
+    setupPacks(); 
+    availableCards = baseCards.slice(); 
+    availableArtifacts = artifactPool.slice(); 
+    fertilizedFields = field.map(()=>null);
+    quests = [generateQuest(), generateQuest()];
+    generatePermanentQuest();
+    drawCards(); 
+    updateUI(); 
+  }
+
+  document.getElementById('openCrate').addEventListener('click', openCrate);
+  document.getElementById('buyField').addEventListener('click', buyField);
+  document.getElementById('buyPen').addEventListener('click', buyPen);
+  init();
+
+  window.__farm_debug = { getState: ()=>({day,coins,field,pens,warehouse,artifacts,sealedCrates,meter,upcomingDisasters,artifactChoices,packs,pickedPacks,availableCards,availableArtifacts,droughtFields,fertilizedFields,tutorialActive,quests,questDifficultyLevel,progressiveTax,permanentQuestLevel,permanentQuest}) };
+
+})();
+</script>
+</body>
+</html>
