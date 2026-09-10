@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>🌾 Ферма — паки и расширяемая колода (Атмосферная)</title>
+<title>🌾 Ферма — паки и расширяемая колода (Инкрементальная)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Inter:wght@400;500;600;700;900&family=MedievalSharp&display=swap" rel="stylesheet">
@@ -46,9 +46,6 @@
     --danger: #c0392b;
 
     --crate-glow: rgba(212, 160, 23, 0.95);
-    --fertile-bg: linear-gradient(180deg,#1e4d2b,#2d6b3e);
-    --drought-bg: linear-gradient(180deg,#6b4423,#8b5a2b);
-    --soon-glow: 0 0 18px rgba(192,57,43,0.95);
   }
 
   *{box-sizing:border-box}
@@ -108,18 +105,6 @@
     z-index: 0;
     mix-blend-mode: multiply;
   }
-
-  h1{
-    margin: 0;
-    font-family: var(--font-medieval);
-    font-size: 28px;
-    color: var(--text-light);
-    text-shadow: 2px 2px 0 rgba(0,0,0,0.4), 0 0 12px rgba(255,200,100,0.3);
-    letter-spacing: 0.5px;
-  }
-
-  h1::before{ content: '🌾 '; font-size: 26px; }
-  h1::after{ content: ' 🏡'; font-size: 26px; }
 
   h3{
     margin: 0 0 10px;
@@ -357,10 +342,12 @@
     flex-wrap: wrap;
   }
 
+  /* ====== ИСПРАВЛЕНО: загон выше, кнопка продажи приподнята и влезает ====== */
   .stall{
     position: relative;
     width: 128px;
-    height: 110px;
+    height: 122px;               /* чуть выше, чтобы всё влезало */
+    padding-bottom: 20px;       /* приподнимаем содержимое над соломой */
     border-radius: 8px;
     display: flex;
     align-items: center;
@@ -427,7 +414,7 @@
   }
 
   .stall .animal{
-    font-size: 42px;
+    font-size: 40px;
     filter: drop-shadow(2px 3px 2px rgba(0,0,0,0.6));
     z-index: 2;
     animation: animalBob 2.4s ease-in-out infinite;
@@ -453,11 +440,14 @@
     box-shadow: 0 2px 3px rgba(0,0,0,0.3);
   }
 
-  /* sell button inside stall - ensure it's above straw */
+  /* кнопка продажи приподнята, компактна и полностью влезает */
   .stall .sell-btn{
     position: relative;
     z-index: 3;
-    margin-top: 4px;
+    margin-top: 3px;
+    margin-bottom: 2px;
+    padding: 4px 9px;
+    font-size: 12px;
   }
 
   .stall.pig-max {
@@ -1033,6 +1023,18 @@
     border-radius: 8px 8px 0 0;
   }
 
+  /* бессрочный квест — золотая рамка */
+  .quest-card.permanent {
+    border: 2px solid var(--accent-gold);
+    box-shadow:
+      inset 0 0 0 1px var(--accent-gold),
+      0 3px 0 var(--wood-dark),
+      0 0 14px rgba(212,160,23,0.45);
+  }
+  .quest-card.permanent::after {
+    background: linear-gradient(90deg, var(--accent-gold), #fff8dc, var(--accent-gold));
+  }
+
   .quest-head {
     display: flex;
     align-items: center;
@@ -1140,6 +1142,10 @@
     color: #8b6a3a;
   }
 
+  .quest-reward-artifact {
+    color: var(--accent);
+  }
+
   .quest-btn {
     padding: 6px 14px;
     font-size: 13px;
@@ -1164,7 +1170,6 @@
     background: linear-gradient(180deg, #5cc05f 0%, var(--accent) 50%, #3d8b40 100%);
   }
 
-  /* hidden crate button */
   .crate-btn.hidden-crate {
     display: none;
   }
@@ -1224,7 +1229,7 @@
     </div>
 
     <div class="panel" id="artifactPanel" style="padding-top:8px; display:none;">
-      <div class="panel-title title-reward" style="width:100%; justify-content:center;"><h3 style="margin:0">Награда за беду — выберите артефакт</h3></div>
+      <div class="panel-title title-reward" style="width:100%; justify-content:center;"><h3 style="margin:0">Награда — выберите артефакт</h3></div>
       <div id="artifactChoicesContainer" class="artifact-choices-grid"></div>
     </div>
 
@@ -1263,7 +1268,7 @@
     <div class="panel">
       <div class="panel-title title-quests"><h3 style="margin:0">Квесты жителей</h3></div>
       <div class="quests-list" id="questsList"></div>
-      <div class="note">Жители деревни просят продукты. Выполните квест вовремя, чтобы получить награду!</div>
+      <div class="note">Жители деревни просят продукты. Квесты усложняются со временем. Постоянный заказ приносит артефакты.</div>
     </div>
 
     <div class="panel">
@@ -1315,6 +1320,12 @@
   // Bankruptcy warning state
   let bankruptcyWarningShown = false;
 
+  // ====== ИНКРЕМЕНТАЛЬНЫЕ СИСТЕМЫ ======
+  let questDifficultyLevel = 0;     // уровень сложности обычных квестов
+  let progressiveTax = 0;           // прогрессивный налог
+  let permanentQuestLevel = 1;      // уровень бессрочного квеста
+  let permanentQuest = null;        // текущий бессрочный квест
+
   const el=id=>document.getElementById(id);
   function notify(text, timeout=2800){ const n=document.createElement('div'); n.className='notif'; n.textContent=text; document.getElementById('notifRoot').appendChild(n); setTimeout(()=>{ n.remove(); }, timeout); }
   
@@ -1322,16 +1333,35 @@
     const overlay = el('warningOverlay');
     overlay.textContent = text;
     overlay.style.display = 'block';
-    // Restart animation
     overlay.style.animation = 'none';
-    overlay.offsetHeight; // trigger reflow
+    overlay.offsetHeight;
     overlay.style.animation = '';
     setTimeout(() => { overlay.style.display = 'none'; }, 3000);
   }
 
   function addCrates(n){ if(n<=0) return; const hasDoubler = artifacts.some(a => a.id === 'crate_doubler'); sealedCrates += n * (hasDoubler ? 2 : 1); }
   function getTaxReduction(){ return artifacts.filter(a=>a.id==='tax_reduce').length; }
-  function computeTax(){ const base=Math.floor((day-1)/5); return Math.max(0, base - getTaxReduction() + taxIncrease); }
+
+  // ====== ПРОГРЕССИВНЫЙ НАЛОГ ======
+  // Растёт медленно до 10, затем +1/день до 40, +3/день до 100, +10/день до 300, затем +100/день
+  function growTax() {
+    if (progressiveTax < 10) {
+      if (day % 5 === 0) progressiveTax += 1;
+    } else if (progressiveTax < 40) {
+      progressiveTax += 1;
+    } else if (progressiveTax < 100) {
+      progressiveTax += 3;
+    } else if (progressiveTax < 300) {
+      progressiveTax += 10;
+    } else {
+      progressiveTax += 100;
+    }
+  }
+
+  function computeTax(){ 
+    return Math.max(0, progressiveTax - getTaxReduction() + taxIncrease); 
+  }
+
   function weightedPick(list, weights){ const total = weights.reduce((s,w)=>s+w,0); let r = Math.random() * total; for(let i=0;i<list.length;i++){ if(r < weights[i]) return list[i]; r -= weights[i]; } return list[list.length-1]; }
 
   function getItemPrice(t) {
@@ -1479,7 +1509,6 @@
 
   function getAvailablePlantTypes(){ const base = ['wheat','cabbage','potato','eggplant']; if(pickedPacks.has('sunflower_pack')) base.push('sunflower'); if(pickedPacks.has('tulip_pack')) base.push('tulip'); return base; }
 
-  // === Quests ===
   function getAvailableItemsForQuests() {
     const all = ['wheat','potato','cabbage','eggplant','milk','eggs'];
     if (pickedPacks.has('sunflower_pack')) all.push('sunflower');
@@ -1487,7 +1516,7 @@
     return all;
   }
 
-  // NPC без имён собственных, просто описания
+  // NPC без имён собственных
   const NPC_POOL = [
     {icon: '👨‍🌾', name: 'Крестьянин'},
     {icon: '👵', name: 'Старушка'},
@@ -1505,27 +1534,46 @@
     {icon: '🧑‍🚀', name: 'Чужеземец'}
   ];
 
+  // ====== СЛОЖНОСТЬ ОБЫЧНЫХ КВЕСТОВ ======
+  // Начало: 1 тип, 1-4 продукта. Каждый уровень циклически:
+  // +1 к максимуму продуктов -> +1 к минимуму продуктов -> +1 к типу (не больше 7)
+  function getQuestDifficulty() {
+    const L = questDifficultyLevel;
+    let maxQty = 4 + Math.floor((L + 2) / 3);
+    let minQty = 1 + Math.floor((L + 1) / 3);
+    let types = 1 + Math.floor(L / 3);
+    types = Math.min(types, 7);
+    maxQty = Math.min(maxQty, 50);
+    if (minQty > maxQty) minQty = maxQty;
+    return { types, minQty, maxQty, level: L };
+  }
+
+  // Ящики: 0 до 3 уровня, затем 1 + по 1 за каждые 5 уровней
+  function getQuestCrates(level) {
+    if (level < 3) return 0;
+    return 1 + Math.floor((level - 3) / 5);
+  }
+
   function generateQuest() {
+    const diff = getQuestDifficulty();
+    const level = diff.level;
     const available = getAvailableItemsForQuests();
-    // 2-4 типа продуктов
-    const numItems = Math.min(2 + Math.floor(Math.random() * 3), available.length);
+    const numItems = Math.min(diff.types, available.length);
     const shuffled = available.slice().sort(() => Math.random() - 0.5);
     const picked = shuffled.slice(0, numItems);
-    
-    // 1-7 продуктов каждого типа
     const requirements = picked.map(item => ({
       item,
-      qty: 1 + Math.floor(Math.random() * 7)
+      qty: diff.minQty + Math.floor(Math.random() * (diff.maxQty - diff.minQty + 1))
     }));
     
     const totalValue = requirements.reduce((sum, r) => sum + r.qty * getItemPrice(r.item), 0);
     
-    // Награда: суммарная стоимость × 1.3 с округлением вниз + бонус
-    const coins = Math.floor(totalValue * 1.3) + 5 + Math.floor(Math.random() * 10);
-    let crates = 0;
-    if (totalValue >= 12) crates = 1;
-    if (totalValue >= 30) crates = 2;
-    if (totalValue >= 60) crates = 3;
+    // В начале денег меньше, растут со сложностью
+    const multiplier = 1.0 + Math.min(level * 0.1, 1.5);
+    const bonus = 3 + Math.floor(level / 2) + Math.floor(Math.random() * 6);
+    const rewardCoins = Math.floor(totalValue * multiplier) + bonus;
+    
+    const rewardCrates = getQuestCrates(level);
     
     const npc = NPC_POOL[Math.floor(Math.random() * NPC_POOL.length)];
     
@@ -1535,13 +1583,91 @@
       name: npc.name,
       requirements,
       daysLeft: 10 + Math.floor(Math.random() * 16),
-      rewardCoins: coins,
-      rewardCrates: crates,
+      rewardCoins,
+      rewardCrates,
       totalValue
     };
   }
 
+  // ====== БЕССРОЧНЫЙ КВЕСТ ======
+  // Ур. N: N+1 типов продуктов по N+2 штук. Ур.1 — лёгкие продукты.
+  // Награда: выбор артефакта (без денег).
+  function getPermanentQuestDifficulty() {
+    return { types: permanentQuestLevel + 1, qty: permanentQuestLevel + 2 };
+  }
+
+  function generatePermanentQuest() {
+    const diff = getPermanentQuestDifficulty();
+    const available = getAvailableItemsForQuests();
+    let pool;
+    if (permanentQuestLevel === 1) {
+      // лёгкие продукты (дешёвые)
+      pool = ['wheat', 'milk', 'eggs'].filter(i => available.includes(i));
+      if (pool.length === 0) pool = available;
+    } else {
+      pool = available;
+    }
+    const numItems = Math.min(diff.types, pool.length);
+    const shuffled = pool.slice().sort(() => Math.random() - 0.5);
+    const picked = shuffled.slice(0, numItems);
+    const requirements = picked.map(item => ({ item, qty: diff.qty }));
+    permanentQuest = {
+      id: 'perm_quest',
+      npc: '🏛️',
+      name: 'Постоянный заказ',
+      requirements,
+      isPermanent: true,
+      level: permanentQuestLevel
+    };
+  }
+
+  // Общий механизм выбора артефактов
+  function rollArtifactChoices(count) {
+    const candidates = Array.from(new Map((availableArtifacts.concat(artifactPool)).map(a=>[a.id,a])).values()).filter(a=>!artifacts.find(x=>x.id===a.id));
+    if (candidates.length === 0) return null;
+    const picks = [];
+    const pool = candidates.slice();
+    while (picks.length < count && pool.length > 0) {
+      const idx = Math.floor(Math.random() * pool.length);
+      picks.push(pool.splice(idx, 1)[0]);
+    }
+    return picks;
+  }
+
+  function acceptPermanentQuest() {
+    if (artifactChoices) { notify('Сначала выберите артефакт-награду'); return; }
+    if (packChoices) { notify('Сначала выберите пак'); return; }
+    if (tutorialActive) { notify('Завершите обучение прежде чем продолжить'); return; }
+    const q = permanentQuest;
+    if (!q) return;
+    for (const r of q.requirements) {
+      if ((warehouse[r.item] || 0) < r.qty) {
+        notify('❌ Недостаточно продуктов для постоянного заказа!');
+        return;
+      }
+    }
+    for (const r of q.requirements) warehouse[r.item] -= r.qty;
+
+    permanentQuestLevel++;
+
+    const choices = rollArtifactChoices(3);
+    if (choices) {
+      artifactChoices = choices;
+      notify('✨ Постоянный заказ выполнен! Выберите артефакт в награду.', 3200);
+    } else {
+      const fallback = 12 + Math.floor(Math.random() * 10);
+      coins += fallback;
+      notify(`✨ Заказ выполнен! Артефактов не осталось, +${fallback} монет.`, 3200);
+    }
+
+    generatePermanentQuest(); // новый уровень
+    updateUI();
+  }
+
   function acceptQuest(id) {
+    if (artifactChoices) { notify('Сначала выберите артефакт-награду'); return; }
+    if (packChoices) { notify('Сначала выберите пак'); return; }
+    if (tutorialActive) { notify('Завершите обучение прежде чем продолжить'); return; }
     const q = quests.find(x => x.id === id);
     if (!q) return;
     
@@ -1564,6 +1690,9 @@
     notify(rewardMsg, 3500);
     
     quests = quests.filter(x => x.id !== id);
+
+    // Выполнение квеста усложняет будущие
+    questDifficultyLevel++;
     
     if (quests.length < 2) {
       quests.push(generateQuest());
@@ -1707,6 +1836,9 @@
     const tax = computeTax(); if(tax>0) coins -= tax;
     if(coins < 0){ gameOver = true; alert('Игра окончена — недостаточно монет'); return; }
 
+    // рост прогрессивного налога на следующий день
+    growTax();
+
     meter += 10; if(meter > 100) meter = 100;
 
     if(meter >= 70){
@@ -1719,10 +1851,13 @@
       }
     }
 
-    // Quests
+    // Квесты: таймеры, провал усложняет будущие
     quests.forEach(q => q.daysLeft--);
     const expired = quests.filter(q => q.daysLeft <= 0);
-    expired.forEach(q => notify(`⏰ Квест от "${q.name}" провален — срок истёк!`, 3200));
+    expired.forEach(q => {
+      notify(`⏰ Квест от "${q.name}" провален — срок истёк!`, 3200);
+      questDifficultyLevel++; // невыполнение тоже усложняет
+    });
     quests = quests.filter(q => q.daysLeft > 0);
     
     while (quests.length < 2) {
@@ -1734,7 +1869,7 @@
     day++;
     processDisastersForDay(day);
 
-    // Reset bankruptcy warning after successful day
+    // Сброс предупреждения о банкротстве после успешного дня
     bankruptcyWarningShown = false;
 
     if(day % 15 === 0){
@@ -1877,16 +2012,14 @@
         }
       }
 
-      const candidates = Array.from(new Map((availableArtifacts.concat(artifactPool)).map(a=>[a.id,a])).values()).filter(a=>!artifacts.find(x=>x.id===a.id));
-      if(candidates.length === 0){ artifactChoices = null; }
-      else {
-        const picks = [];
-        const pool = candidates.slice();
-        while(picks.length < 3 && pool.length>0){ const idx = Math.floor(Math.random()*pool.length); picks.push(pool.splice(idx,1)[0]); }
-        artifactChoices = picks;
+      const choices = rollArtifactChoices(3);
+      if (choices) {
+        artifactChoices = choices;
+        notify('После беды доступны артефакты — выберите один (под картами).');
+      } else {
+        artifactChoices = null;
       }
 
-      notify('После беды доступны артефакты — выберите один (под картами).');
       meter = 0;
     });
     upcomingDisasters = upcomingDisasters.filter(d => d.day !== currentDay);
@@ -2151,7 +2284,7 @@
     el('streakNote').textContent = meter >= 100 ? '⚠️ Беда запланирована!' : `До беды: ${daysTo} ход(ов)`;
 
     const artList = el('artifactList'); artList.innerHTML='';
-    if(artifacts.length===0){ artList.innerHTML = '<div class="small-muted" style="padding: 6px 0; font-style: italic;">Артефактов пока нет — переживите беду чтобы получить их</div>'; } else {
+    if(artifacts.length===0){ artList.innerHTML = '<div class="small-muted" style="padding: 6px 0; font-style: italic;">Артефактов пока нет — переживите беду или выполните постоянный заказ</div>'; } else {
       artifacts.forEach(a=>{
         const node = document.createElement('div'); node.className='artifact';
         node.innerHTML = `<div style="display:flex;gap:10px;align-items:center"><div style="font-size:24px">${a.icon}</div><div><div style="font-weight:700; font-family: var(--font-medieval); font-size: 15px;">${a.name}</div><div class="small-muted">${a.desc||''}</div></div></div><div><button class="sell-btn" data-id="${a.id}">💰 Продать</button></div>`;
@@ -2175,10 +2308,46 @@
       disList.innerHTML = '<div class="small-muted" style="padding: 6px 0; font-style: italic;">Пока никаких бед не предвидится</div>';
     }
 
+    // ====== КВЕСТЫ ====== */
     const qList = el('questsList');
     qList.innerHTML = '';
+
+    // Бессрочный квест (всегда сверху, золотая рамка)
+    if (permanentQuest) {
+      const pq = permanentQuest;
+      const canComplete = pq.requirements.every(r => (warehouse[r.item] || 0) >= r.qty);
+      let reqHtml = pq.requirements.map(r => {
+        const have = warehouse[r.item] || 0;
+        const ok = have >= r.qty;
+        const emoji = iconMap[r.item] || '❓';
+        return `<div class="quest-req ${ok ? 'ok' : 'missing'}"><span>${emoji} ${r.qty}</span><span class="have">(${have})</span></div>`;
+      }).join('');
+      const pdiv = document.createElement('div');
+      pdiv.className = 'quest-card permanent';
+      pdiv.innerHTML = `
+        <div class="quest-head">
+          <span class="quest-npc">🏛️</span>
+          <span class="quest-name">Постоянный заказ (ур. ${permanentQuestLevel})</span>
+          <span class="quest-timer" style="background:linear-gradient(180deg,var(--accent-gold),#a67c00)">∞</span>
+        </div>
+        <div class="quest-reqs">${reqHtml}</div>
+        <div class="quest-footer">
+          <span class="quest-reward"><span class="quest-reward-artifact">🧿 Артефакт</span></span>
+          <button class="sell-btn quest-btn" ${!canComplete ? 'disabled' : ''}>📜 Отдать</button>
+        </div>
+      `;
+      pdiv.querySelector('.quest-btn').addEventListener('click', acceptPermanentQuest);
+      qList.appendChild(pdiv);
+    }
+
+    // Обычные квесты
     if (quests.length === 0) {
-      qList.innerHTML = '<div class="small-muted" style="padding: 6px 0; font-style: italic;">Квестов пока нет — жители скоро придут</div>';
+      const emptyNote = document.createElement('div');
+      emptyNote.className = 'small-muted';
+      emptyNote.style.padding = '6px 0';
+      emptyNote.style.fontStyle = 'italic';
+      emptyNote.textContent = 'Квестов пока нет — жители скоро придут';
+      qList.appendChild(emptyNote);
     } else {
       quests.forEach(q => {
         const div = document.createElement('div');
@@ -2231,6 +2400,7 @@
     availableArtifacts = artifactPool.slice(); 
     fertilizedFields = field.map(()=>null);
     quests = [generateQuest(), generateQuest()];
+    generatePermanentQuest();
     drawCards(); 
     updateUI(); 
   }
@@ -2240,7 +2410,7 @@
   document.getElementById('buyPen').addEventListener('click', buyPen);
   init();
 
-  window.__farm_debug = { getState: ()=>({day,coins,field,pens,warehouse,artifacts,sealedCrates,meter,upcomingDisasters,artifactChoices,packs,pickedPacks,availableCards,availableArtifacts,droughtFields,fertilizedFields,tutorialActive,quests}) };
+  window.__farm_debug = { getState: ()=>({day,coins,field,pens,warehouse,artifacts,sealedCrates,meter,upcomingDisasters,artifactChoices,packs,pickedPacks,availableCards,availableArtifacts,droughtFields,fertilizedFields,tutorialActive,quests,questDifficultyLevel,progressiveTax,permanentQuestLevel,permanentQuest}) };
 
 })();
 </script>
