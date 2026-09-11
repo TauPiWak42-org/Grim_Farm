@@ -1223,6 +1223,106 @@
     font-size: 11px;
     padding: 4px 8px;
   }
+
+  .tutorial-overlay{
+    position: fixed;
+    left: 0; top: 0; right: 0; bottom: 0;
+    background: rgba(20,10,5,0.92);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+    animation: overlayFadeIn 0.3s ease;
+  }
+
+  .tutorial-panel{
+    background: var(--panel-inner);
+    padding: 30px;
+    border-radius: 14px;
+    border: 4px solid var(--wood-dark);
+    box-shadow:
+      inset 0 0 0 2px var(--wood-light),
+      inset 0 0 30px rgba(139,90,43,0.25),
+      0 15px 40px rgba(0,0,0,0.5);
+    max-width: 650px;
+    width: 90vw;
+    max-height: 85vh;
+    overflow-y: auto;
+    position: relative;
+    color: var(--text-dark);
+  }
+
+  .tutorial-title{
+    font-family: var(--font-medieval);
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    text-align: center;
+    color: var(--text-dark);
+    text-shadow: 1px 1px 0 rgba(255,255,255,0.4);
+  }
+
+  .tutorial-content{
+    font-size: 15px;
+    line-height: 1.6;
+    margin-bottom: 24px;
+    color: var(--text-dark);
+  }
+
+  .tutorial-table{
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 13px;
+  }
+
+  .tutorial-table td{
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(139,90,43,0.2);
+    vertical-align: middle;
+  }
+
+  .tutorial-table td:first-child{
+    font-size: 20px;
+    width: 40px;
+  }
+
+  .tutorial-nav{
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .tutorial-progress{
+    font-size: 13px;
+    color: var(--muted);
+    font-family: var(--font-medieval);
+    text-align: center;
+    margin-top: 12px;
+  }
+
+  .tutorial-dots{
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 8px;
+  }
+
+  .tutorial-dot{
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(139,90,43,0.3);
+    transition: all 0.2s ease;
+  }
+
+  .tutorial-dot.active{
+    background: var(--accent-gold);
+    box-shadow: 0 0 8px rgba(212,160,23,0.6);
+  }
 </style>
 </head>
 <body>
@@ -1297,8 +1397,9 @@
           <button id="saveGameBtn" class="crate-btn">💾 Сохранить</button>
           <button id="loadGameBtn" class="crate-btn">📂 Загрузить</button>
           <button id="resetGameBtn" class="crate-btn" style="background:linear-gradient(180deg, #c0392b, #8b2a1e);">🗑️ Сброс</button>
+          <button id="tutorialBtn" class="crate-btn" style="background:linear-gradient(180deg, #3498db, #2874a6);">❓ Обучение</button>
         </div>
-        <div class="small-muted" style="margin-top:4px;">v<span id="versionDisplay">0.1.147</span></div>
+        <div class="small-muted" style="margin-top:4px;">v<span id="versionDisplay">0.1.148</span></div>
       </div>
     </div>
 
@@ -1323,7 +1424,7 @@
   // ============================================================
   // VERSION & CONFIG
   // ============================================================
-  const VERSION = '0.1.147';
+  const VERSION = '0.1.148';
   document.getElementById('versionDisplay').textContent = VERSION;
 
   const CONFIG = {
@@ -1436,7 +1537,7 @@
   };
   let sellAllSettings = {...defaultSellAll};
 
-  // Гейт для будущего туториала; пока всегда false.
+  // Гейт для туториала; true во время показа обучения.
   let tutorialActive = false;
   
   // bankruptcyWarningShown: двухшаговое подтверждение риска.
@@ -2750,6 +2851,8 @@
     el('crates').textContent = sealedCrates;
 
     el('versionDisplay').textContent = VERSION;
+    
+    updateDisasterBadge();
   }
 
   function renderGameUI() {
@@ -3014,15 +3117,7 @@
     }
   }
 
-  function updateDisasters() {
-    el('meterFill').style.width = Math.min(100, meter) + '%';
-    const daysTo = Math.ceil((100 - meter) / 10);
-    el('streakNote').textContent = meter >= 100 ? '⚠️ Беда запланирована!' : `До беды: ${daysTo} ход(ов)`;
-
-    const disList = el('disasters');
-    disList.innerHTML = '';
-
-    // Бейдж бедствия в HUD
+  function updateDisasterBadge() {
     const badge = el('disasterBadge');
     if (upcomingDisasters.length > 0) {
       const next = upcomingDisasters.slice().sort((a, b) => a.day - b.day)[0];
@@ -3041,6 +3136,15 @@
       badge.classList.remove('active');
       badge.classList.remove('soon');
     }
+  }
+
+  function updateDisasters() {
+    el('meterFill').style.width = Math.min(100, meter) + '%';
+    const daysTo = Math.ceil((100 - meter) / 10);
+    el('streakNote').textContent = meter >= 100 ? '⚠️ Беда запланирована!' : `До беды: ${daysTo} ход(ов)`;
+
+    const disList = el('disasters');
+    disList.innerHTML = '';
 
     if (upcomingDisasters.length > 0) {
       const next = upcomingDisasters.slice().sort((a, b) => a.day - b.day)[0];
@@ -3376,6 +3480,123 @@
   }
 
   // ============================================================
+  // TUTORIAL
+  // ============================================================
+
+  const TUTORIAL_STEPS = [
+    {
+      title: '🌾 Добро пожаловать на ферму!',
+      content: 'Здесь вы сажаете, растите животных, продаёте товары и платите налог. Цель — продержаться как можно дольше, не уйдя в минус.'
+    },
+    {
+      title: '🃏 Карты дня',
+      content: 'Каждый день выбирайте одну из трёх карт. Карта — это ваше действие на день: посадить, купить животное, рискнуть. После выбора карта выполняется, наступает ночь и приходит налог.'
+    },
+    {
+      title: '🌱 Поля и удобрения',
+      content: 'У вас есть поля. Растения созревают за 2–4 хода, потом их можно собрать кликом. Удобрение (🧪) ускоряет рост на 1 ход и удваивает урожай. Поля можно купить — до 11 штук, а артефакт 🟫 добавит ещё одно сверх лимита.'
+    },
+    {
+      title: '🏚️ Загоны и животные',
+      content: 'В загонах живут животные. Каждое даёт свой продукт и требует свою еду. Если еды нет — животное погибнет. Свинью и козла можно продать прямо из загона по выросшей цене.',
+      table: [
+        {emoji: '🐄', text: 'Корова — ест 🌿 сено (если не хватает свободных полей), даёт 🥛 молоко каждый день.'},
+        {emoji: '🐔', text: 'Курица — ест 🌾 пшеницу или 🌻 подсолнух, даёт 🥚 яйца каждый день.'},
+        {emoji: '🐖', text: 'Свинья — ест 🥔 картошку, цена удваивается за кормление (до 1024).'},
+        {emoji: '🐐', text: 'Козёл — ест 🥬 капусту, цена +13 за кормление, даёт 🥛 молоко.'}
+      ]
+    },
+    {
+      title: '📦 Склад и продажи',
+      content: 'Собранный урожай и продукты попадают на склад. Там же кнопка продажи — одиночная или галочка «всё» для опта. Следите за ценой тюльпанов — она меняется каждый ход.'
+    },
+    {
+      title: '📜 Квесты жителей',
+      content: 'Справа — квесты от жителей. Они просят продукты в обмен на монеты и ящики. Провал квеста усложняет будущие. Постоянный заказ (золотая рамка) даёт артефакт.'
+    },
+    {
+      title: '⚠️ Бедствия и налог',
+      content: 'Каждые 10 дней приходит беда: волки, саранча, грабители или засуха. Их тип виден в бейдже HUD и в панели справа. Налог растёт со временем — не уходите в минус, иначе игра окончена. Удачи!'
+    }
+  ];
+
+  let tutorialStep = 0;
+
+  function showTutorial() {
+    tutorialActive = true;
+    tutorialStep = 0;
+    renderTutorialStep();
+  }
+
+  function renderTutorialStep() {
+    const existing = document.getElementById('tutorialOverlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'tutorial-overlay';
+    overlay.id = 'tutorialOverlay';
+
+    const panel = document.createElement('div');
+    panel.className = 'tutorial-panel';
+
+    const step = TUTORIAL_STEPS[tutorialStep];
+
+    let html = `<h2 class="tutorial-title">${step.title}</h2>`;
+    html += `<div class="tutorial-content">${step.content}</div>`;
+
+    if (step.table) {
+      html += '<table class="tutorial-table">';
+      step.table.forEach(row => {
+        html += `<tr><td>${row.emoji}</td><td>${row.text}</td></tr>`;
+      });
+      html += '</table>';
+    }
+
+    html += '<div class="tutorial-nav">';
+    html += `<button class="crate-btn" id="tutorialPrev" ${tutorialStep === 0 ? 'disabled' : ''}>← Назад</button>`;
+    html += `<button class="crate-btn" id="tutorialSkip" style="background:linear-gradient(180deg, #95a5a6, #7f8c8d);">Пропустить</button>`;
+    html += `<button class="crate-btn" id="tutorialNext">${tutorialStep === TUTORIAL_STEPS.length - 1 ? '🎮 Начать игру' : 'Дальше →'}</button>`;
+    html += '</div>';
+
+    html += `<div class="tutorial-progress">Шаг ${tutorialStep + 1} из ${TUTORIAL_STEPS.length}</div>`;
+    html += '<div class="tutorial-dots">';
+    for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
+      html += `<div class="tutorial-dot ${i === tutorialStep ? 'active' : ''}"></div>`;
+    }
+    html += '</div>';
+
+    panel.innerHTML = html;
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+
+    document.getElementById('tutorialPrev').addEventListener('click', () => {
+      if (tutorialStep > 0) {
+        tutorialStep--;
+        renderTutorialStep();
+      }
+    });
+
+    document.getElementById('tutorialSkip').addEventListener('click', closeTutorial);
+
+    document.getElementById('tutorialNext').addEventListener('click', () => {
+      if (tutorialStep < TUTORIAL_STEPS.length - 1) {
+        tutorialStep++;
+        renderTutorialStep();
+      } else {
+        closeTutorial();
+      }
+    });
+  }
+
+  function closeTutorial() {
+    tutorialActive = false;
+    localStorage.setItem('grimFarmTutorialCompleted', 'true');
+    const overlay = document.getElementById('tutorialOverlay');
+    if (overlay) overlay.remove();
+    updateUI();
+  }
+
+  // ============================================================
   // INIT
   // ============================================================
   
@@ -3394,6 +3615,11 @@
 
     drawCards();
     updateUI();
+
+    // Показываем туториал при первом запуске
+    if (localStorage.getItem('grimFarmTutorialCompleted') !== 'true') {
+      showTutorial();
+    }
   }
 
   el('openCrate').addEventListener('click', openCrate);
@@ -3411,6 +3637,7 @@
   });
   el('resetGameBtn').addEventListener('click', resetToInitialState);
   el('restartBtn').addEventListener('click', resetToInitialState);
+  el('tutorialBtn').addEventListener('click', showTutorial);
 
   window.__farm_debug = {
     getState: () => ({
